@@ -1,0 +1,11 @@
+.env
+.git
+__pycache__/
+*.pyc
+tests/
+tools/
+examples/
+# Magasin vivant : jamais lu au build (voir Dockerfile), sans rapport avec
+# l'image. Le laisser hors du contexte de build évite aussi d'y renvoyer par
+# erreur des fichiers de test locaux (model_v2.json, v3.json...).
+server/store/

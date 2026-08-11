@@ -1,0 +1,10 @@
+fastapi>=0.110
+uvicorn[standard]>=0.27
+pydantic>=2.6
+numpy>=1.24
+scipy>=1.11
+python-dotenv>=1.0
+# pandas et openpyxl ne servent qu'à tools/fit_pretrained.py (hors serveur),
+# qui lit le classeur Excel de l'étude. Le serveur n'en a pas besoin.
+pandas>=2.0
+openpyxl>=3.1

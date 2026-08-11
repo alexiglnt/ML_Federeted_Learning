@@ -1,0 +1,12 @@
+gamma (deg),r_beta (um),Vc (m/min),h (mm),SRS_L (MPa),source,coolant
+0.0,5.0,100.0,0.06,-75.0,CHEN2022,dry/MQL/cryo/hybrid
+0.0,28.0,100.0,0.06,-175.0,CHEN2022,dry/MQL/cryo/hybrid
+0.0,50.0,100.0,0.06,-250.0,CHEN2022,dry/MQL/cryo/hybrid
+0.0,28.0,100.0,0.06,374.0,CHEN2022,dry/MQL/cryo/hybrid
+0.0,28.0,100.0,0.06,274.0,CHEN2022,dry/MQL/cryo/hybrid
+-6.0,47.0,30.0,0.05,-110.0,HOLMBERG2018,dry
+-6.0,47.0,60.0,0.05,715.0,HOLMBERG2018,dry
+-6.0,47.0,120.0,0.05,275.0,HOLMBERG2018,dry
+-6.0,47.0,30.0,0.15,-710.0,HOLMBERG2018,dry
+-6.0,47.0,60.0,0.15,820.0,HOLMBERG2018,dry
+-6.0,47.0,120.0,0.15,455.0,HOLMBERG2018,dry

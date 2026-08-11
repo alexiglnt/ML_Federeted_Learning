@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin — Federated residual-stress models — DEAM Lab</title>
+<meta name="robots" content="noindex">
+<script>
+  if (localStorage.getItem("deam-theme") === "dark") {
+    document.documentElement.setAttribute("data-theme", "dark");
+  }
+</script>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="wrap">
+    <div class="header-top">
+      <p class="eyebrow">DEAM Lab — administration</p>
+      <button type="button" id="theme-toggle" class="theme-toggle"
+              aria-pressed="false">
+        <span class="theme-toggle-icon" aria-hidden="true">🌙</span>
+        <span class="theme-toggle-label">Dark mode</span>
+      </button>
+    </div>
+    <h1>Review pending contributions</h1>
+    <p class="lead">
+      Contributions never enter the published model automatically. Review what
+      is waiting below, then either preview or publish the next version — an
+      exact refit on the pooled sums, never an average of coefficients.
+      <a href="index.html">&larr; Back to the public page</a>
+    </p>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- accès ---------------------------------------------------------------- -->
+  <section class="step" id="step-auth">
+    <h2><span class="num">1</span> Admin key</h2>
+    <p>
+      Kept only for this browser tab (<code>sessionStorage</code>) — closing the
+      tab forgets it. Every request below carries it in the
+      <code>X-Admin-Key</code> header; it is never written anywhere else.
+    </p>
+    <form id="auth-form" class="form-grid" novalidate>
+      <div class="field-row">
+        <label for="admin-key">Admin key</label>
+        <input id="admin-key" name="admin-key" type="password" autocomplete="off">
+      </div>
+      <div class="full submit-row">
+        <button class="primary" type="submit">Unlock</button>
+        <button class="secondary" type="button" id="forget-key-button">Forget key</button>
+      </div>
+    </form>
+    <div id="auth-report" class="report" hidden></div>
+  </section>
+
+  <!-- file d'attente --------------------------------------------------------- -->
+  <section class="step" id="step-queue" hidden>
+    <h2><span class="num">2</span> Pending contributions</h2>
+    <p>
+      Unchecked rows are left in the queue for a later round — same as
+      <code>--exclude</code> on the command line. Nothing here shows individual
+      measurements: only what the queue itself ever received.
+    </p>
+    <div class="submit-row" style="margin-bottom: 1rem;">
+      <button class="secondary" type="button" id="refresh-queue-button">Refresh</button>
+    </div>
+    <div id="queue-report" class="report" hidden></div>
+    <div id="queue-wrap"></div>
+  </section>
+
+  <!-- action ------------------------------------------------------------------ -->
+  <section class="step" id="step-action" hidden>
+    <h2><span class="num">3</span> Preview or publish</h2>
+    <p>
+      Preview computes the next version without writing anything — the same
+      numbers you would get from publishing, to check before committing.
+    </p>
+    <div class="submit-row">
+      <button class="secondary" type="button" id="preview-button">Preview (dry run)</button>
+      <button class="primary" type="button" id="publish-button">Publish new version</button>
+    </div>
+    <div id="action-report" class="report" hidden></div>
+    <div id="action-detail"></div>
+  </section>
+
+  <!-- historique --------------------------------------------------------------- -->
+  <section class="step" id="step-history" hidden>
+    <h2>Published versions</h2>
+    <div id="history"></div>
+
+    <div class="field-row" style="margin-top: 1.5rem;">
+      <label for="rollback-select">Roll back to</label>
+      <select id="rollback-select"></select>
+      <p class="hint">
+        Publishes a new version with the exact same content as the one chosen
+        — nothing is deleted, the in-between versions stay in the history
+        above.
+      </p>
+    </div>
+    <div class="submit-row">
+      <button class="secondary" type="button" id="rollback-button">Roll back</button>
+    </div>
+    <div id="rollback-report" class="report" hidden></div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <p>
+      DEAM Lab — models from the Ti-6Al-4V orthogonal turning study.
+      Aggregation is an exact pooled refit from summed sufficient statistics,
+      never FedAvg weight averaging — see <code>server/aggregate.py</code>.
+    </p>
+  </div>
+</footer>
+
+<script type="module" src="js/admin.js"></script>
+</body>
+</html>

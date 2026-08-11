@@ -1,0 +1,22 @@
+# Variante pour un VPS où Caddy tourne déjà (service système, pas Docker) —
+# voir DEPLOY.md, section "Variante : Caddy déjà installé". Pas de conteneur
+# Caddy ici : seule l'application tourne, exposée uniquement en local (jamais
+# sur l'interface publique) pour que le Caddy système soit le seul point
+# d'entrée depuis Internet.
+#
+# Le port hôte (8420 ci-dessous) doit être libre sur CE serveur : vérifiez
+# avec `sudo ss -tlnp` avant de démarrer, et changez-le des deux côtés
+# (ici et dans le bloc reverse_proxy du Caddyfile système) s'il est déjà pris
+# par un autre site. Le port du conteneur (le second, 8000) reste interne à
+# Docker et n'a pas besoin d'être libre côté hôte — seul le premier compte.
+#
+# Utilisation : docker compose -f docker-compose.external-caddy.yml up -d --build
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./server/store:/app/server/store
+    ports:
+      - "127.0.0.1:8420:8000"

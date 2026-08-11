@@ -1,0 +1,12 @@
+# Remplacer par le vrai nom de domaine du site (doit déjà pointer vers
+# l'adresse IP de ce serveur avant de démarrer). Caddy obtient et renouvelle
+# seul le certificat HTTPS — rien d'autre à configurer, pas de certbot.
+votre-domaine.exemple.com {
+    reverse_proxy app:8000
+}
+
+# Pour tester sans nom de domaine (HTTP local uniquement, pas de HTTPS) :
+# commenter le bloc ci-dessus et décommenter celui-ci.
+# :80 {
+#     reverse_proxy app:8000
+# }
