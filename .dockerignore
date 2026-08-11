@@ -1,11 +1,20 @@
+# Keep the build context small and, more importantly, keep secrets and other
+# people's data out of the image.
 .env
-.git
+var/
+api/var/
+legacy/
+
+.git/
+.venv/
+.venv-tools/
 __pycache__/
-*.pyc
-tests/
-tools/
-examples/
-# Magasin vivant : jamais lu au build (voir Dockerfile), sans rapport avec
-# l'image. Le laisser hors du contexte de build évite aussi d'y renvoyer par
-# erreur des fichiers de test locaux (model_v2.json, v3.json...).
-server/store/
+*.py[cod]
+
+node_modules/
+web/node_modules/
+web/dist/
+
+*.md
+.vscode/
+.idea/

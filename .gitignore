@@ -1,15 +1,28 @@
-# Clés secrètes — voir .env.example et README.md pour comment les créer.
-# Ne jamais commiter .env : c'est tout l'intérêt du fichier.
+# Secrets. .env.example is committed; .env never is.
 .env
 
-# Magasin du serveur : entièrement ignoré, y compris store/models/. Ce dossier
-# est vivant (contributions reçues, versions publiées), reconstitué à chaque
-# déploiement depuis server/seed/ — jamais depuis le dépôt. Le committer
-# figerait les modèles de test locaux (v2, v3, v4…) comme s'ils étaient
-# canoniques. server/seed/model_v1.json et aggregate_v1.json, eux, SONT suivis :
-# c'est la seule copie publique et versionnée du modèle initial.
-server/store/
+# Uploaded files, model artefacts, anything a contributor entrusted to the
+# server. Never in the repository.
+var/
+api/var/
 
 # Python
 __pycache__/
 *.py[cod]
+.venv/
+.venv-tools/
+*.egg-info/
+
+# Node
+node_modules/
+web/dist/
+
+# Editors and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# The pre-rebuild site's private store: published models were public, but
+# queued contributions and pooled sums were not.
+legacy/server/store/
