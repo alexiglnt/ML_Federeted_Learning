@@ -6,6 +6,8 @@ import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Me from "./pages/Me";
 import NotFound from "./pages/NotFound";
+import ProjectDetail from "./pages/ProjectDetail";
+import ProjectNew from "./pages/ProjectNew";
 import Projects from "./pages/Projects";
 import Register from "./pages/Register";
 import Variables from "./pages/Variables";
@@ -26,6 +28,16 @@ export default function App() {
       <Route element={<Layout />}>
         <Route index element={<Home />} />
         <Route path="projects" element={<Projects />} />
+        {/* Declared before ":slug" so "new" is not read as a project slug. */}
+        <Route
+          path="projects/new"
+          element={
+            <RequireAuth>
+              <ProjectNew />
+            </RequireAuth>
+          }
+        />
+        <Route path="projects/:slug" element={<ProjectDetail />} />
         <Route path="variables" element={<Variables />} />
         <Route path="login" element={<Login />} />
         <Route path="register" element={<Register />} />

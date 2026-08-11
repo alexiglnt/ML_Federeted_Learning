@@ -455,6 +455,180 @@ textarea {
   margin: 0.3rem 0 0;
 }
 
+/* --------------------------------------------------------------------- */
+/* Projects                                                               */
+/* --------------------------------------------------------------------- */
+.page-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.page-head h1 {
+  margin-bottom: 0;
+}
+
+.project-list {
+  list-style: none;
+  padding: 0;
+  margin: 1.5rem 0;
+  display: grid;
+  gap: 0.9rem;
+}
+.project-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem 1.1rem;
+}
+.project-card h3 {
+  margin: 0;
+}
+.project-card h3 a {
+  text-decoration: none;
+}
+.project-card h3 a:hover {
+  text-decoration: underline;
+}
+.project-card .eyebrow {
+  margin: 0.2rem 0 0.5rem;
+}
+
+/* Dot-separated run of facts; the separator is decorative so it is generated
+   rather than written into the markup. */
+.meta-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.9rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin: 0.5rem 0 1rem;
+}
+.meta-line > span + span::before {
+  content: "·";
+  margin-right: 0.9rem;
+  opacity: 0.5;
+}
+
+.badge {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-radius: 999px;
+  padding: 0.05rem 0.55rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+/* Section numbers in the creation form. */
+h2 .num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.82rem;
+  margin-right: 0.5rem;
+}
+
+.field-row.wide {
+  max-width: 40rem;
+}
+
+input.tiny,
+.tiny {
+  max-width: 7rem;
+}
+.range-cell {
+  display: flex;
+  gap: 0.35rem;
+}
+.row-actions {
+  white-space: nowrap;
+}
+.tiny-button {
+  padding: 0.15rem 0.45rem;
+  font-size: 0.85rem;
+}
+
+/* --------------------------------------------------------------------- */
+/* Variable picker                                                        */
+/* --------------------------------------------------------------------- */
+.picker {
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem 1.1rem;
+  margin: 1.25rem 0;
+}
+.picker .field-row {
+  margin-top: 0;
+}
+
+.picker-results {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 0.9rem;
+  max-height: 15rem;
+  overflow-y: auto;
+  display: grid;
+  gap: 0.3rem;
+}
+.picker-item {
+  width: 100%;
+  justify-content: space-between;
+  background: var(--surface);
+  text-align: left;
+}
+.picker-item:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.propose-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem;
+  margin-top: 0.75rem;
+}
+.propose-box h4 {
+  margin: 0 0 0.3rem;
+}
+.propose-grid {
+  display: grid;
+  gap: 0 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+}
+.propose-grid .field-row {
+  margin: 0.6rem 0 0;
+  max-width: none;
+}
+
+.chip-list {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.3rem 0.55rem 0.3rem 0.85rem;
+}
+.chip.static {
+  padding-right: 0.85rem;
+}
+
 @media (max-width: 40rem) {
   .header-inner {
     gap: 0.75rem;

@@ -14,7 +14,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from api.config import settings
-from api.routers import auth, variables
+from api.routers import auth, projects, variables
 
 # Written here by the Dockerfile's front-end build stage. Absent in local
 # API-only development, where Vite serves the front end on its own port and
@@ -30,6 +30,7 @@ app = FastAPI(
 
 app.include_router(auth.router)
 app.include_router(variables.router)
+app.include_router(projects.router)
 
 
 @app.get("/api/health")

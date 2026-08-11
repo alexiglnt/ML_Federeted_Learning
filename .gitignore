@@ -16,6 +16,8 @@ __pycache__/
 # Node
 node_modules/
 web/dist/
+# Incremental build cache written by `tsc -b`; machine-specific and noisy.
+*.tsbuildinfo
 
 # Editors and OS
 .vscode/

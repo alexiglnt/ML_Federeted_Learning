@@ -19,7 +19,7 @@ started — there are no half-built features hiding in the tree.
 | Lot | Scope | Status |
 |---|---|---|
 | 0 | Foundations — DB, auth, API and front skeletons, seed data | ✅ done |
-| 1 | Variable registry, project creation wizard | ⬜ not started |
+| 1 | Variable registry, project creation wizard | ✅ done |
 | 2 | Upload, column mapping, validation, training, versioning | ⬜ not started |
 | 3 | Project page — inputs, validity domain, version timeline | ⬜ not started |
 | 4 | Discovery — faceted search and "match my file" | ⬜ not started |
@@ -109,9 +109,25 @@ Verified end to end from empty volumes: `docker compose down -v` followed by
 `γ (°)` and `rβ (µm)` match the registry correctly, which is the case that
 matters because they are the literal headings in the source study.
 
-Pages that exist but say "not built yet" (projects, dashboard) do so
-deliberately — the navigation is honest about the build state rather than
-offering dead links.
+Pages that exist but say "not built yet" do so deliberately — the navigation is
+honest about the build state rather than offering dead links.
+
+## What lot 1 adds
+
+Projects can be created and read. The creation form picks inputs and targets
+from the registry, lets a missing quantity be proposed inline and used at once,
+and stores input order — which is contractual, not cosmetic, because a
+contribution whose columns are permuted fits silently wrong coefficients.
+
+Rules enforced and covered by the smoke test: a variable cannot be both input
+and target of one project (it would predict a column from itself); duplicates
+are rejected; slugs are unique and permanent, suffixed on collision rather than
+reused; a *proposed* registry variable is usable by its proposer immediately
+but by nobody else until moderated; the permission matrix holds for anonymous
+visitors, other signed-in users, and the owner.
+
+New projects start as `draft` — they have no data, so there is nothing to
+contribute to yet. Lot 2 is what promotes them.
 
 ## Known gaps and deliberate omissions
 
