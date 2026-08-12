@@ -3,11 +3,20 @@ import json
 import sys
 import urllib.parse
 import urllib.request
+import uuid
 import http.cookiejar
 
 BASE = "http://localhost:8000"
 jar = http.cookiejar.CookieJar()
 opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
+
+#: Tagged so the file can be run twice against the same database. The three
+#: casings below are the point of several checks — registration lowercases the
+#: address, login does not care about case — so they are derived from one
+#: mixed-case original rather than written out separately and drifting apart.
+EMAIL_MIXED = f"Smoke.Test+{uuid.uuid4().hex[:8]}@Example.com"
+EMAIL_LOWER = EMAIL_MIXED.lower()
+EMAIL_UPPER = EMAIL_MIXED.upper()
 
 
 def call(path, body=None, method=None):
@@ -56,17 +65,17 @@ status, body = call("/api/auth/me")
 check("/me is 200 and null when signed out", status == 200 and body is None, f"status={status}")
 
 status, body = call("/api/auth/register", {
-    "email": "Smoke.Test@Example.com", "password": "correct-horse-battery",
+    "email": EMAIL_MIXED, "password": "correct-horse-battery",
     "full_name": "Smoke Test", "institution": "Nowhere",
 })
 check("register", status == 201, f"status={status} {body}")
-check("email is lowercased", (body or {}).get("email") == "smoke.test@example.com", str((body or {}).get("email")))
+check("email is lowercased", (body or {}).get("email") == EMAIL_LOWER, str((body or {}).get("email")))
 
 status, body = call("/api/auth/me")
-check("/me returns the new user after register", status == 200 and body and body["email"] == "smoke.test@example.com")
+check("/me returns the new user after register", status == 200 and body and body["email"] == EMAIL_LOWER)
 
 status, body = call("/api/auth/register", {
-    "email": "smoke.test@example.com", "password": "another-password-here",
+    "email": EMAIL_LOWER, "password": "another-password-here",
     "full_name": "Duplicate",
 })
 check("duplicate email rejected", status == 409, f"status={status}")
@@ -76,7 +85,7 @@ check("logout", status == 204, f"status={status}")
 status, body = call("/api/auth/me")
 check("/me null after logout", status == 200 and body is None)
 
-status, body = call("/api/auth/login", {"email": "smoke.test@example.com", "password": "wrong"})
+status, body = call("/api/auth/login", {"email": EMAIL_LOWER, "password": "wrong"})
 check("wrong password rejected", status == 401, f"status={status}")
 check("error message does not reveal account existence",
       "Incorrect email address or password" in str((body or {}).get("detail")))
@@ -85,7 +94,7 @@ status, body = call("/api/auth/login", {"email": "nobody@example.com", "password
 check("unknown account gives the same message", status == 401 and
       "Incorrect email address or password" in str((body or {}).get("detail")))
 
-status, body = call("/api/auth/login", {"email": "SMOKE.TEST@example.com", "password": "correct-horse-battery"})
+status, body = call("/api/auth/login", {"email": EMAIL_UPPER, "password": "correct-horse-battery"})
 check("login is case-insensitive on email", status == 200, f"status={status}")
 
 print("\n== Protected route ==")

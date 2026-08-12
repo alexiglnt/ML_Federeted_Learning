@@ -8,6 +8,9 @@ import Me from "./pages/Me";
 import NotFound from "./pages/NotFound";
 import ProjectDetail from "./pages/ProjectDetail";
 import ProjectNew from "./pages/ProjectNew";
+import ProjectPredict from "./pages/ProjectPredict";
+import ProjectSettings from "./pages/ProjectSettings";
+import ProjectUpload from "./pages/ProjectUpload";
 import Projects from "./pages/Projects";
 import Register from "./pages/Register";
 import Variables from "./pages/Variables";
@@ -38,6 +41,33 @@ export default function App() {
           }
         />
         <Route path="projects/:slug" element={<ProjectDetail />} />
+        <Route
+          path="projects/:slug/upload"
+          element={
+            <RequireAuth>
+              <ProjectUpload />
+            </RequireAuth>
+          }
+        />
+        {/* Both need an account before they can say anything useful. The
+            finer gates — model access, ownership — are the server's, and the
+            pages render what it reports rather than deciding for themselves. */}
+        <Route
+          path="projects/:slug/predict"
+          element={
+            <RequireAuth>
+              <ProjectPredict />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="projects/:slug/settings"
+          element={
+            <RequireAuth>
+              <ProjectSettings />
+            </RequireAuth>
+          }
+        />
         <Route path="variables" element={<Variables />} />
         <Route path="login" element={<Login />} />
         <Route path="register" element={<Register />} />

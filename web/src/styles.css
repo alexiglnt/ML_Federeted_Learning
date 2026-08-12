@@ -23,6 +23,8 @@
   --accent-soft: #e8f0f6;
   --danger: #9b2c2c;
   --danger-soft: #fbeaea;
+  --warn: #8a5a12;
+  --warn-soft: #fbf1de;
   --radius: 8px;
   --shadow: 0 1px 2px rgb(0 0 0 / 6%), 0 4px 12px rgb(0 0 0 / 4%);
 }
@@ -39,6 +41,8 @@
   --accent-soft: #22303c;
   --danger: #e08a8a;
   --danger-soft: #3a2323;
+  --warn: #e0be7a;
+  --warn-soft: #3a3122;
   --shadow: 0 1px 2px rgb(0 0 0 / 30%), 0 4px 12px rgb(0 0 0 / 20%);
 }
 
@@ -518,6 +522,161 @@ textarea {
   padding: 0.05rem 0.55rem;
   font-size: 0.78rem;
   font-weight: 600;
+  white-space: nowrap;
+}
+/* For things needing a second look rather than an error: an approximate
+   column match, a contribution still awaiting review. */
+.badge.warn {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.warning-list {
+  padding-left: 1.1rem;
+  color: var(--text-muted);
+}
+.warning-list li {
+  margin-bottom: 0.4rem;
+}
+
+/* --------------------------------------------------------------------- */
+/* Models and versions                                                    */
+/* --------------------------------------------------------------------- */
+.model-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr));
+  margin: 1.25rem 0;
+}
+.model-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.1rem;
+}
+.model-card h3 {
+  margin: 0;
+}
+.model-card h4 {
+  margin: 1rem 0 0.3rem;
+  font-size: 0.9rem;
+}
+
+.score-grid {
+  display: grid;
+  gap: 0.75rem;
+  margin: 1rem 0 0.5rem;
+}
+.score dt {
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+.score dd {
+  margin: 0;
+  font-size: 1.5rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+.score .hint {
+  margin: 0.15rem 0 0;
+}
+/* The score that answers the question a reader actually has gets the weight. */
+.score.headline dd {
+  color: var(--accent);
+  font-size: 2rem;
+  font-weight: 700;
+}
+.score.muted-score dd {
+  color: var(--text-muted);
+}
+
+.equation {
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.7rem 0.85rem;
+  overflow-x: auto;
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.locked {
+  background: var(--accent-soft);
+  border-radius: var(--radius);
+  padding: 0.8rem 0.95rem;
+  font-size: 0.9rem;
+  margin-top: 1rem;
+}
+
+.timeline {
+  list-style: none;
+  padding: 0;
+  margin: 1.25rem 0;
+  display: grid;
+  gap: 0.6rem;
+}
+.timeline-item {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
+}
+.timeline-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0.75rem 1rem;
+  text-align: left;
+}
+.timeline-head:hover {
+  background: var(--surface-alt);
+}
+.version-number {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  min-width: 2.5rem;
+}
+.timeline-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.9rem;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  margin-right: auto;
+}
+.timeline-body {
+  padding: 0 1rem 1rem;
+  border-top: 1px solid var(--border);
+}
+.timeline-body h4 {
+  font-size: 0.9rem;
+  margin: 1rem 0 0.4rem;
+}
+.source-list {
+  padding-left: 1.1rem;
+  margin: 0;
+  font-size: 0.92rem;
+}
+
+.details {
+  margin: 1.25rem 0;
+}
+.details summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+input[type="file"] {
+  border: 1px dashed var(--border);
+  background: var(--surface-alt);
+  padding: 1rem;
+  max-width: 34rem;
 }
 
 /* Section numbers in the creation form. */
@@ -627,6 +786,257 @@ input.tiny,
 }
 .chip.static {
   padding-right: 0.85rem;
+}
+
+/* --------------------------------------------------------------------- */
+/* Validity domain                                                        */
+/* --------------------------------------------------------------------- */
+/* The bar is stretched rather than scaled — the x axis is a percentage, so
+   there is no aspect ratio worth preserving and no text inside to distort. */
+.domain-cell {
+  min-width: 16rem;
+}
+.domain-svg {
+  display: block;
+  width: 100%;
+  height: 1.6rem;
+}
+.domain-track {
+  fill: var(--surface-alt);
+}
+/* A claim about the project, in a colour that is nobody's data. */
+.domain-declared {
+  fill: var(--text-muted);
+  opacity: 0.32;
+}
+/* Evidence, in the accent. The owner's own band is the solid one; what stays
+   visible in the lighter tone underneath it is what other labs added. */
+.domain-added {
+  fill: var(--accent);
+  opacity: 0.34;
+}
+.domain-owner {
+  fill: var(--accent);
+}
+
+.domain-scale {
+  display: flex;
+  justify-content: space-between;
+  font-variant-numeric: tabular-nums;
+}
+.domain-facts {
+  list-style: none;
+  padding: 0;
+  margin: 0.3rem 0 0;
+  display: grid;
+  gap: 0.1rem;
+}
+.domain-facts li {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.swatch {
+  display: inline-block;
+  flex: none;
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 2px;
+}
+.swatch.declared {
+  background: var(--text-muted);
+  opacity: 0.32;
+}
+.swatch.owner {
+  background: var(--accent);
+}
+.swatch.added {
+  background: var(--accent);
+  opacity: 0.34;
+}
+.swatch.empty {
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+}
+
+/* --------------------------------------------------------------------- */
+/* Contributors                                                           */
+/* --------------------------------------------------------------------- */
+.contributor-list {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0;
+  display: grid;
+  gap: 0.6rem;
+}
+.contributor {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.7rem 0.9rem;
+}
+.contributor .meta-line {
+  margin: 0.2rem 0 0;
+}
+
+/* --------------------------------------------------------------------- */
+/* Prediction                                                             */
+/* --------------------------------------------------------------------- */
+.predict-grid {
+  display: grid;
+  gap: 0 1.25rem;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+}
+.predict-grid .field-row {
+  margin: 0.8rem 0 0;
+  max-width: none;
+}
+.prediction-value {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  margin: 0.3rem 0 0;
+}
+/* An input outside the range there is data for. Not an error — the prediction
+   is still given — so it wears the "look again" colour, not the red one. */
+.warn-text {
+  color: var(--warn);
+}
+.warn-notice {
+  background: var(--warn-soft);
+  border-left-color: var(--warn);
+}
+
+/* --------------------------------------------------------------------- */
+/* Contribution review                                                    */
+/* --------------------------------------------------------------------- */
+.review-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--warn);
+  border-radius: var(--radius);
+  padding: 1rem 1.2rem;
+  margin: 1rem 0;
+}
+.review-card h3 {
+  margin: 0;
+}
+.review-card .field-row {
+  margin: 1rem 0 0;
+}
+
+.score-cell {
+  font-variant-numeric: tabular-nums;
+  font-size: 1.05rem;
+}
+.score-cell.good {
+  color: var(--accent);
+  font-weight: 700;
+}
+.score-cell.weak {
+  color: var(--warn);
+}
+.score-cell.poor {
+  color: var(--danger);
+}
+.score-cell.unknown {
+  color: var(--text-muted);
+}
+
+/* The interpretation, next to the numbers rather than in a document nobody
+   has open. Getting this reading wrong is expensive in both directions. */
+.reading {
+  border-radius: var(--radius);
+  padding: 0.7rem 0.9rem;
+  margin: 1rem 0 0;
+  font-size: 0.93rem;
+  background: var(--surface-alt);
+}
+.reading.good {
+  background: var(--accent-soft);
+}
+/* Poor transfer with a good refit: the contribution most likely to be thrown
+   away by mistake, and the one worth most. */
+.reading.valuable {
+  background: var(--accent-soft);
+  border-left: 3px solid var(--accent);
+}
+.reading.poor {
+  background: var(--danger-soft);
+  border-left: 3px solid var(--danger);
+}
+
+.badge.muted-badge {
+  background: var(--surface-alt);
+  color: var(--text-muted);
+}
+
+/* --------------------------------------------------------------------- */
+/* Discovery                                                              */
+/* --------------------------------------------------------------------- */
+.facets {
+  display: grid;
+  gap: 0.5rem;
+  margin: 1.25rem 0;
+}
+.facet {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.5rem 0.9rem 0.9rem;
+  margin: 0;
+  background: var(--surface);
+}
+.facet legend {
+  font-weight: 600;
+  font-size: 0.85rem;
+  padding: 0 0.35rem;
+}
+.facet .chip-list {
+  margin: 0.4rem 0 0;
+}
+.facet .field-row {
+  margin: 0.4rem 0 0;
+}
+
+.chip.toggle {
+  border-radius: 999px;
+  padding: 0.25rem 0.75rem;
+}
+.chip.toggle.on {
+  background: var(--accent);
+  color: var(--accent-text);
+  border-color: var(--accent);
+}
+.chip.toggle.on .muted {
+  color: var(--accent-text);
+  opacity: 0.75;
+}
+
+.match-card .page-head {
+  align-items: center;
+}
+.match-card h3 {
+  margin: 0;
+}
+/* Orders the list and nothing more — the parts underneath are what a reader
+   should decide on, so this stays quiet rather than becoming a verdict. */
+.match-score {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--accent);
+  font-size: 1.1rem;
+}
+.match-facts {
+  list-style: none;
+  padding: 0;
+  margin: 0.6rem 0 0;
+  display: grid;
+  gap: 0.25rem;
+}
+.match-facts code {
+  margin-right: 0.25rem;
 }
 
 @media (max-width: 40rem) {

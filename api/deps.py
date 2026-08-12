@@ -118,12 +118,12 @@ def require_project_owner(db: Session, project: Project, user: User) -> None:
 
 def grant_contributor_access(
     db: Session, project: Project, user_id: int, contribution_id: int
-) -> None:
+) -> bool:
     """Give a contributor model access, on acceptance of a shared contribution.
 
     Deliberately not called at submission time: see ProjectAccess's docstring.
     Idempotent, because a second accepted contribution from the same person
-    must not fail.
+    must not fail. Returns whether this call is what created the access.
     """
     existing = db.scalar(
         select(ProjectAccess).where(
@@ -132,7 +132,7 @@ def grant_contributor_access(
         )
     )
     if existing is not None:
-        return
+        return False
     db.add(
         ProjectAccess(
             project_id=project.id,
@@ -141,16 +141,26 @@ def grant_contributor_access(
             source_contribution_id=contribution_id,
         )
     )
+    return True
 
 
 def revoke_contributor_access_if_unearned(
     db: Session, project: Project, user_id: int
-) -> None:
+) -> bool:
     """Drop model access when a user no longer has any accepted shared data.
 
     Called after a rejection or a withdrawal. Without it, a contributor could
     unlock a model and then pull their data back out, which is exactly the
     free-ride the review step exists to prevent.
+
+    ⚠️ The caller must have **flushed** the status change before calling this.
+    Sessions here are created with `autoflush=False`, so an unflushed change is
+    invisible to the query below: it would still see the contribution as
+    accepted, conclude the access is earned, and leave it in place. The failure
+    is silent — the caller reports a revocation that did not happen.
+
+    Returns whether access was actually removed. It is not removed when the
+    same person still has other accepted shared data on this project.
     """
     from api.models import Contribution, ContributionMode  # local: avoid a cycle
 
@@ -163,7 +173,7 @@ def revoke_contributor_access_if_unearned(
         )
     )
     if still_earned is not None:
-        return
+        return False
     row = db.scalar(
         select(ProjectAccess).where(
             ProjectAccess.project_id == project.id,
@@ -171,5 +181,7 @@ def revoke_contributor_access_if_unearned(
             ProjectAccess.role == AccessRole.CONTRIBUTOR,
         )
     )
-    if row is not None:
-        db.delete(row)
+    if row is None:
+        return False
+    db.delete(row)
+    return True

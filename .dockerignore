@@ -15,6 +15,10 @@ node_modules/
 web/node_modules/
 web/dist/
 
+# Documentation is not needed at runtime, but tests/ is: the invariant checks
+# are meant to be runnable against a deployed container.
 *.md
+!tests/*.md
+
 .vscode/
 .idea/

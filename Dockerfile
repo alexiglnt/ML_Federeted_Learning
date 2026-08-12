@@ -37,6 +37,9 @@ COPY api/requirements.txt api/requirements.txt
 RUN pip install --no-cache-dir -r api/requirements.txt
 
 COPY api/ api/
+# Shipped so the invariant checks can be run against a deployed container:
+#   docker compose exec app python tests/check_aggregation.py
+COPY tests/ tests/
 COPY alembic.ini ./
 COPY entrypoint.sh ./
 RUN chmod +x entrypoint.sh

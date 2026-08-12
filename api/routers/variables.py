@@ -15,7 +15,8 @@ from api.db import get_db
 from api.deps import get_current_user, require_moderator
 from api.models import User, Variable, VariableAlias, VariableStatus
 from api.schemas import VariableOut, VariableProposal
-from api.services.naming import normalise, similarity
+from api.services.matching import approved_variables, match_column
+from api.services.naming import normalise
 
 router = APIRouter(prefix="/api/variables", tags=["variables"])
 
@@ -64,42 +65,22 @@ def match_columns(
     one by approximate match, please check" is honest where "compatible" is
     not, and a wrong match here silently fits a model to the wrong column.
     """
-    variables = list(
-        db.scalars(
-            select(Variable)
-            .where(Variable.status == VariableStatus.APPROVED)
-            .options(selectinload(Variable.aliases))
-        )
-    )
-
+    registry = approved_variables(db)
     out = []
     for column in columns[:100]:
-        norm = normalise(column)
-        scored = []
-        for variable in variables:
-            # An exact hit on the key, the display name or a registered alias
-            # is certainty; anything else is a suggestion to be confirmed.
-            candidates = {normalise(variable.key), normalise(variable.display_name)}
-            candidates.update(a.alias for a in variable.aliases)
-            if norm and norm in candidates:
-                scored.append((1.0, variable))
-                continue
-            best = max((similarity(norm, c) for c in candidates), default=0.0)
-            if best >= 0.5:
-                scored.append((best, variable))
-
-        scored.sort(key=lambda pair: pair[0], reverse=True)
+        matches = match_column(column, registry)[:3]
         out.append(
             {
                 "column": column,
-                "normalised": norm,
+                "normalised": normalise(column),
                 "matches": [
                     {
-                        "variable": VariableOut.model_validate(v).model_dump(),
-                        "confidence": round(score, 3),
-                        "exact": score >= 1.0,
+                        "variable": VariableOut.model_validate(m.variable).model_dump(),
+                        "confidence": round(m.confidence, 3),
+                        "exact": m.exact,
+                        "unit_conflict": m.unit_conflict,
                     }
-                    for score, v in scored[:3]
+                    for m in matches
                 ],
             }
         )
