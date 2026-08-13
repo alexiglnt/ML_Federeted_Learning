@@ -246,6 +246,23 @@ class ContributionOut(BaseModel):
     review_note: str | None = None
 
 
+class PoolabilityOut(BaseModel):
+    """The third score of ARCHITECTURE.md §5.7, checked on request.
+
+    Unlike `transfer_score`/`refit_score`, this is never stored on the
+    `Contribution` row — it is a question about the *current* accepted pool,
+    which shifts under a pending contribution every time another one is
+    accepted or rejected, so a cached answer would go stale silently.
+    """
+
+    engine: str | None = None
+    #: {target_key: {own_r2, own_rmse, own_n, pool_r2_before, pool_r2_after,
+    #: pool_delta, n_contributors_before, n_contributors_after}} on success,
+    #: or {target_key: {"note"/"error": str}} when nothing was computable.
+    per_target: dict = {}
+    note: str | None = None
+
+
 class ContributionReview(BaseModel):
     """An owner's decision on one contribution.
 

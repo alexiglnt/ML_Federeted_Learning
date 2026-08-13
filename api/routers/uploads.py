@@ -61,12 +61,13 @@ from api.schemas import (
     DatasetCommit,
     FederatedCommit,
     MappingSuggestion,
+    PoolabilityOut,
     ReviewResult,
     TrainingJobOut,
     UploadPreview,
     ValidationOut,
 )
-from api.services import federated, scoring, storage, training
+from api.services import federated, poolability, scoring, storage, training
 from api.services.dataset import build_and_validate
 from api.services.matching import approved_variables, suggest_mapping
 from api.services.tabular import ParseError, numeric_columns, parse_upload
@@ -848,6 +849,34 @@ def _settle(
     if accepted_set_changed:
         job_id = training.queue_training(db, project.id, kind=action).id
     return granted, revoked, job_id
+
+
+@router.get("/contributions/{contribution_id}/poolability", response_model=PoolabilityOut)
+def contribution_poolability(
+    slug: str,
+    contribution_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """The third score of ARCHITECTURE.md §5.7: preview the effect of
+    accepting this pending contribution, checked live rather than cached.
+
+    Owner only, same as the review decision itself — this is a preview of
+    exactly the choice the review endpoint makes, not a public diagnostic.
+    """
+    project = _load_project(db, slug)
+    require_project_owner(db, project, user)
+
+    contribution = db.get(Contribution, contribution_id)
+    if contribution is None or contribution.project_id != project.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such contribution.")
+
+    try:
+        result = poolability.score(db, project, contribution)
+    except poolability.PoolabilityError as error:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(error)) from error
+
+    return PoolabilityOut(**result)
 
 
 @router.post("/contributions/{contribution_id}/review", response_model=ReviewResult)

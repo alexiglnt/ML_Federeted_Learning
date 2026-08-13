@@ -280,6 +280,44 @@ other than where it was built?* — and an ordinary cross-validated R² never
 answers it, because it holds out points, not sources. This platform is the only
 place the measurement is possible. It belongs on the project page, prominently.
 
+### 5.7 Poolability — checked live, never cached
+
+§5.3's two scores answer "is this contribution good on its own terms" —
+against the published model (transfer) and against itself (refit). Neither
+answers the question that only matters once a project has more than one
+contributor: *if this is accepted, does §5.6's leave-one-lab-out score get
+better or worse for everyone else too?* A row can be perfectly
+self-consistent and still be the outlier that wrecks it for the rest of the
+pool. That failure mode is invisible to transfer and refit alike, and it is
+the whole subject of a systematic audit this platform grew a feature from:
+one bad row pulled a published baseline's honest R² from 0.61 to −4.86.
+
+Two numbers, computed against the *current* accepted pool, for a pending
+**shared** contribution only:
+
+- **own score** — a model fit on every accepted contributor except this one,
+  scored against this contribution's own rows. Does everyone else's data
+  predict this lab?
+- **pool effect** — leave-one-lab-out R² of the accepted pool, before vs.
+  after adding this contribution as one more group. Does accepting it move
+  the model's honest score for everyone, not just for this lab?
+
+Shared-mode only, unlike transfer and refit: a federated contribution never
+gives the server raw rows, only `n`, `D'D`, `D'y`, `y'y` (§5.1). A true
+held-out check needs an actual row to predict and compare, which does not
+exist server-side for a federated contributor. Rather than publish an
+approximate number under an honest-sounding name, a federated pending
+contribution gets an explanation instead of a score.
+
+And unlike transfer and refit, poolability is **never persisted** on the
+`Contribution` row. Transfer is explicitly pinned to a version number — "measured
+against v{N}" — because a stale, labelled score is still meaningful history.
+Poolability has no such anchor: it is a question about the *current* accepted
+pool, and that pool changes underneath a pending contribution every time
+another one is accepted or rejected elsewhere. Caching it would go stale
+between two reviewers' decisions with nothing visibly wrong. So it is computed
+on request, each time, from whatever is accepted right now.
+
 ---
 
 ## 6. Data model

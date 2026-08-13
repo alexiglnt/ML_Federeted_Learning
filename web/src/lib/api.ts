@@ -495,6 +495,36 @@ export interface RefitScore {
   note?: string | null;
 }
 
+/** Whether accepting this pending contribution would help or hurt the
+ *  model's honest, cross-lab score — checked live against the current
+ *  accepted pool, never cached. Shared-mode contributions only: a federated
+ *  contribution has no raw rows to hold out and predict. See
+ *  ARCHITECTURE.md §5.7. */
+export interface PoolabilityScore {
+  engine: string | null;
+  per_target: Record<
+    string,
+    {
+      /** A model fit on every accepted contributor except this one, scored
+       *  against this contribution's own rows: does everyone else's data
+       *  predict this lab? */
+      own_r2?: number | null;
+      own_rmse?: number | null;
+      own_n?: number;
+      /** Leave-one-lab-out R² of the accepted pool, before vs. after adding
+       *  this contribution as one more group. */
+      pool_r2_before?: number | null;
+      pool_r2_after?: number | null;
+      pool_delta?: number | null;
+      n_contributors_before?: number | null;
+      n_contributors_after?: number | null;
+      note?: string;
+      error?: string;
+    }
+  >;
+  note?: string | null;
+}
+
 export interface ContributionOut {
   id: number;
   project_slug: string;
@@ -555,6 +585,12 @@ export const uploads = {
     ),
   accessLog: (slug: string) =>
     api.get<AccessLogEntry[]>(`/projects/${encodeURIComponent(slug)}/access-log`),
+  /** Owner only, and only for a pending shared contribution. Computed live on
+   *  every call — see PoolabilityScore. */
+  poolability: (slug: string, contributionId: number) =>
+    api.get<PoolabilityScore>(
+      `/projects/${encodeURIComponent(slug)}/contributions/${contributionId}/poolability`,
+    ),
   /** Owner only. Accepting grants model access and queues a retrain. */
   review: (
     slug: string,

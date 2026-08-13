@@ -44,7 +44,7 @@ from api.models import (
     TrainingJob,
 )
 from api.services import engines, piml, storage
-from api.services.dataset import build_and_validate
+from api.services.dataset import BuiltData, build_and_validate
 from api.services.tabular import parse_upload
 
 log = logging.getLogger(__name__)
@@ -80,6 +80,45 @@ def _load_project(db: Session, project_id: int) -> Project:
     return project
 
 
+def load_contribution_rows(project: Project, contribution: Contribution) -> BuiltData | None:
+    """Parse and validate one contribution's stored file, or None if it can't
+    be read or no longer validates against the project.
+
+    Split out of `pool_shared_data`'s loop so the same read-parse-validate
+    step can be run on a single *pending* contribution too — a poolability
+    check (api/services/poolability.py) needs exactly this, for one
+    contribution rather than every accepted one.
+    """
+    dataset = contribution.dataset
+    if dataset is None:
+        return None
+    try:
+        data = storage.absolute_path(dataset.stored_path).read_bytes()
+        table = parse_upload(dataset.original_filename, data)
+        built = build_and_validate(
+            project,
+            table,
+            dataset.column_mapping or {},
+            min_rows=settings.min_contribution_rows,
+        )
+    except (LookupError, OSError, ValueError) as error:
+        # One unreadable file must not stop the whole retrain. It is logged
+        # and skipped, and the version records what actually went in — which
+        # is the point of the lineage table.
+        log.warning(
+            "skipping contribution %s while training project %s: %s",
+            contribution.id, project.slug, error,
+        )
+        return None
+    if not built.report.ok:
+        log.warning(
+            "contribution %s no longer validates against project %s: %s",
+            contribution.id, project.slug, built.report.errors,
+        )
+        return None
+    return built
+
+
 def pool_shared_data(db: Session, project: Project) -> PooledData:
     """Re-read every accepted shared file and stack it.
 
@@ -110,32 +149,8 @@ def pool_shared_data(db: Session, project: Project) -> PooledData:
     )
 
     for contribution in contributions:
-        dataset = contribution.dataset
-        if dataset is None:
-            continue
-        try:
-            data = storage.absolute_path(dataset.stored_path).read_bytes()
-            table = parse_upload(dataset.original_filename, data)
-            built = build_and_validate(
-                project,
-                table,
-                dataset.column_mapping or {},
-                min_rows=settings.min_contribution_rows,
-            )
-        except (LookupError, OSError, ValueError) as error:
-            # One unreadable file must not stop the whole retrain. It is
-            # logged and skipped, and the version records what actually went
-            # in — which is the point of the lineage table.
-            log.warning(
-                "skipping contribution %s while training project %s: %s",
-                contribution.id, project.slug, error,
-            )
-            continue
-        if not built.report.ok:
-            log.warning(
-                "contribution %s no longer validates against project %s: %s",
-                contribution.id, project.slug, built.report.errors,
-            )
+        built = load_contribution_rows(project, contribution)
+        if built is None:
             continue
 
         used.append(contribution.id)

@@ -982,6 +982,10 @@ input.tiny,
   border-left: 3px solid var(--danger);
 }
 
+.poolability {
+  margin: 1rem 0 0;
+}
+
 .badge.muted-badge {
   background: var(--surface-alt);
   color: var(--text-muted);

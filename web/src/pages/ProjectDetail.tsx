@@ -165,6 +165,15 @@ export default function ProjectDetail() {
     }
   }
 
+  /** Checked live, on request, from the card itself — not cached here the
+   *  way the rest of this page's data is, because the answer depends on the
+   *  *current* accepted pool and would go stale the moment another pending
+   *  contribution is decided. See ARCHITECTURE.md §5.7. */
+  function checkPoolability(contribution: ContributionOut) {
+    if (!slug) return Promise.reject(new Error("No project loaded."));
+    return uploadsApi.poolability(slug, contribution.id);
+  }
+
   async function downloadFile(contribution: ContributionOut) {
     if (!slug) return;
     setFileError(null);
@@ -287,6 +296,7 @@ export default function ProjectDetail() {
               busy={busyId === item.id}
               onDownload={() => downloadFile(item)}
               onDecide={(decision, note) => decide(item, decision, note)}
+              onCheckPoolability={() => checkPoolability(item)}
             />
           ))}
         </>

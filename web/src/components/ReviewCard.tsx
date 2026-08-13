@@ -14,10 +14,16 @@
 
 import { useState } from "react";
 
-import type { ContributionOut } from "../lib/api";
+import type { ContributionOut, PoolabilityScore } from "../lib/api";
 
 function score(value: number | null | undefined): string {
   return value === null || value === undefined ? "—" : value.toFixed(3);
+}
+
+function delta(value: number | null | undefined): string {
+  if (value === null || value === undefined) return "—";
+  const sign = value > 0 ? "+" : "";
+  return `${sign}${value.toFixed(3)}`;
 }
 
 /** Deliberately coarse. These are read as "is this good, bad, or worth a look",
@@ -81,18 +87,95 @@ function Reading({ transfer, refit }: { transfer: number | null; refit: number |
   );
 }
 
+/** Thresholds for a *change* in leave-one-lab-out R², not an R² itself — a
+ *  small negative delta is normal sampling noise, but the article's own
+ *  running example (0.61 -> -4.86, Fig. 4) is what "poor" is calibrated to
+ *  catch. */
+function deltaVerdict(value: number | null | undefined): "good" | "weak" | "poor" | "unknown" {
+  if (value === null || value === undefined) return "unknown";
+  if (value >= -0.02) return "good";
+  if (value >= -0.15) return "weak";
+  return "poor";
+}
+
+function PoolabilityReading({
+  ownR2,
+  poolDelta,
+}: {
+  ownR2: number | null;
+  poolDelta: number | null;
+}) {
+  const own = verdict(ownR2);
+  const effect = deltaVerdict(poolDelta);
+
+  if (own === "unknown" && effect === "unknown") return null;
+  if (own === "poor" && effect === "poor") {
+    return (
+      <p className="reading poor">
+        <strong>Looks like an outlier.</strong> A model trained on every other
+        accepted contributor does not predict this lab's data, and accepting
+        it would pull down the model's honest score for every other lab too —
+        not just fail to fit on its own. Worth a hard look before accepting.
+      </p>
+    );
+  }
+  if (own === "poor") {
+    return (
+      <p className="reading">
+        This lab's data is hard to predict from everyone else's, but
+        accepting it would not meaningfully change the shared model's honest
+        score elsewhere — the risk stays contained to this lab's own
+        predictions.
+      </p>
+    );
+  }
+  if (own === "good" && effect !== "poor") {
+    return (
+      <p className="reading good">
+        <strong>Pools cleanly.</strong> Everyone else's data already predicts
+        this lab, and accepting it does not weaken the model's honest score
+        for anyone else.
+      </p>
+    );
+  }
+  return (
+    <p className="reading">
+      Mixed — check the numbers per target below before deciding.
+    </p>
+  );
+}
+
 export default function ReviewCard({
   contribution,
   onDecide,
   onDownload,
+  onCheckPoolability,
   busy,
 }: {
   contribution: ContributionOut;
   onDecide: (decision: "accept" | "reject", note: string) => void;
   onDownload: () => void;
+  onCheckPoolability: () => Promise<PoolabilityScore>;
   busy: boolean;
 }) {
   const [note, setNote] = useState("");
+  const [poolability, setPoolability] = useState<PoolabilityScore | null>(null);
+  const [checkingPoolability, setCheckingPoolability] = useState(false);
+  const [poolabilityError, setPoolabilityError] = useState<string | null>(null);
+
+  async function handleCheckPoolability() {
+    setCheckingPoolability(true);
+    setPoolabilityError(null);
+    try {
+      setPoolability(await onCheckPoolability());
+    } catch (caught) {
+      setPoolabilityError(
+        caught instanceof Error ? caught.message : "Could not check poolability.",
+      );
+    } finally {
+      setCheckingPoolability(false);
+    }
+  }
   const transfer = contribution.transfer_score;
   const refit = contribution.refit_score;
   const targets = Array.from(
@@ -215,6 +298,97 @@ export default function ReviewCard({
         transfer={worst((key) => transfer?.per_target?.[key]?.r2)}
         refit={worst(refitOf)}
       />
+
+      {contribution.mode === "shared" ? (
+        <div className="poolability">
+          {!poolability && (
+            <button
+              type="button"
+              className="ghost tiny-button"
+              disabled={checkingPoolability}
+              onClick={handleCheckPoolability}
+            >
+              {checkingPoolability
+                ? "Checking…"
+                : "Check poolability — does accepting this help or hurt the model?"}
+            </button>
+          )}
+          {poolabilityError && <p className="muted small">{poolabilityError}</p>}
+
+          {poolability && Object.keys(poolability.per_target).length > 0 && (
+            <>
+              <div className="table-scroll">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Target</th>
+                      <th scope="col">
+                        Held-out fit
+                        <br />
+                        <span className="hint">everyone else predicts this lab</span>
+                      </th>
+                      <th scope="col">
+                        Pool effect
+                        <br />
+                        <span className="hint">honest R² if accepted</span>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(poolability.per_target).map(([key, entry]) => (
+                      <tr key={key}>
+                        <td>
+                          <code className="small">{key}</code>
+                        </td>
+                        <td className={`score-cell ${verdict(entry.own_r2)}`}>
+                          {entry.error ? (
+                            <span className="muted small">{entry.error}</span>
+                          ) : entry.note ? (
+                            <span className="muted small">{entry.note}</span>
+                          ) : (
+                            score(entry.own_r2)
+                          )}
+                        </td>
+                        <td className={`score-cell ${deltaVerdict(entry.pool_delta)}`}>
+                          {entry.error || entry.note ? (
+                            "—"
+                          ) : (
+                            <>
+                              {score(entry.pool_r2_before)} → {score(entry.pool_r2_after)}
+                              <br />
+                              <span className="hint">{delta(entry.pool_delta)}</span>
+                            </>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <PoolabilityReading
+                ownR2={(() => {
+                  const values = Object.values(poolability.per_target)
+                    .map((entry) => entry.own_r2)
+                    .filter((v): v is number => v !== null && v !== undefined && Number.isFinite(v));
+                  return values.length ? Math.min(...values) : null;
+                })()}
+                poolDelta={(() => {
+                  const values = Object.values(poolability.per_target)
+                    .map((entry) => entry.pool_delta)
+                    .filter((v): v is number => v !== null && v !== undefined && Number.isFinite(v));
+                  return values.length ? Math.min(...values) : null;
+                })()}
+              />
+            </>
+          )}
+        </div>
+      ) : (
+        <p className="muted small">
+          Poolability can't be checked for federated contributions — the
+          server never sees the raw rows needed to hold this contributor's
+          data out and test whether the model still predicts it.
+        </p>
+      )}
 
       <div className="field-row wide">
         <label htmlFor={`note-${contribution.id}`}>
