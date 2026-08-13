@@ -291,12 +291,19 @@ status, body = call(OTHER, f"/api/projects/{slug}/datasets", {
 })
 check("another user cannot claim a staged upload", status == 410, f"status={status}")
 
-print("\n== federated mode is honestly refused ==")
+print("\n== federated mode is not made by uploading a file ==")
+# Until lot 5b this returned 501. The mode now exists, but it is reached by
+# POSTing summary statistics to .../federated — the whole point is that no file
+# is uploaded — so asking for it here is a request that does not make sense
+# rather than a feature that is missing. Covered end to end by smoke_lot5b.py.
 status, fresh = upload(OTHER, slug, "outeiro.csv", OUTEIRO)
 status, body = call(OTHER, f"/api/projects/{slug}/datasets", {
     "upload_token": fresh["upload_token"], "mapping": good_mapping, "mode": "federated",
 })
-check("federated commit returns 501, not a silent success", status == 501, f"status={status}")
+check("federated is refused on the file endpoint, not silently accepted",
+      status == 400, f"status={status}")
+check("and the refusal says where it does belong",
+      "/federated" in str((body or {}).get("detail", "")), str(body)[:160])
 
 print("\n" + ("ALL PASS" if ok else "FAILURES ABOVE"))
 sys.exit(0 if ok else 1)

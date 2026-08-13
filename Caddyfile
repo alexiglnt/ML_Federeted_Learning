@@ -1,0 +1,157 @@
+# The Caddyfile is an easy way to configure your Caddy web server.
+#
+# Unless the file starts with a global options block, the first
+# uncommented line is always the address of your site.
+#
+# To use your own domain name (with automatic HTTPS), first make
+# sure your domain's A/AAAA DNS records are properly pointed to
+# this machine's public IP, then replace ":80" below with your
+# domain name.
+
+:80 {
+	# Set this path to your site's directory.
+	root * /usr/share/caddy
+
+	# Enable the static file server.
+	file_server
+
+	# Another common task is to set up a reverse proxy:
+	# reverse_proxy localhost:8080
+
+	# Or serve a PHP site through php-fpm:
+	# php_fastcgi localhost:9000
+}
+
+alexigallonet.com {
+    root * /home/alexi/sites/Portfolio/build
+    file_server
+    try_files {path} /index.html
+}
+
+test.alexigallonet.com {
+    root * /home/alexi
+    file_server
+}
+
+lucbruzz.alexigallonet.com {
+    root * /home/alexi/sites/luc
+    file_server
+}
+
+notefinder.alexigallonet.com {
+     root * /home/alexi/sites/NoteFinder/dist
+    file_server
+    try_files {path} /index.html
+}
+
+notefinder.apk.alexigallonet.com {
+    root * /home/alexi/sites/NoteFinderAPK
+    file_server
+}
+
+notefinder.api.alexigallonet.com {
+
+    @cors_origin_localhost header Origin http://localhost:5173
+    @cors_origin_production header Origin https://notefinder.alexigallonet.com
+    @cors_enabled {
+        expression {header.Origin} == "http://localhost:5173" || {header.Origin} == "https://notefinder.alexigallonet.com"
+    }
+
+    
+    header @cors_origin_localhost {
+        Access-Control-Allow-Origin "http://localhost:5173"
+        Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+        Access-Control-Allow-Headers "*"
+        Access-Control-Allow-Credentials "true"
+        Access-Control-Max-Age "3600"
+        defer
+    }
+
+    header @cors_origin_production {
+        Access-Control-Allow-Origin "https://notefinder.alexigallonet.com"
+        Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+        Access-Control-Allow-Headers "*"
+        Access-Control-Allow-Credentials "true"
+        Access-Control-Max-Age "3600"
+        defer
+    }
+    
+    
+    @options method OPTIONS
+    respond @options 204
+    
+    
+    reverse_proxy localhost:3457
+}
+w.alexigallonet.com {
+    root * /home/alexi/sites/Fake_Windows_Login
+    file_server
+}
+
+netfliks.alexigallonet.com {
+    root * /home/alexi/sites/Netfliks
+    file_server
+
+    reverse_proxy /api/* 127.0.0.1:3000
+}
+
+demo-cyber-cwe-209.alexigallonet.com {
+    reverse_proxy localhost:4000
+}
+
+# epreuve-pratique-ci-cd.alexigallonet.com {
+epreuve-tp-finale-ci-cd.alexigallonet.com {
+  encode zstd gzip
+
+  @api path /api/*
+  handle @api {
+    reverse_proxy 127.0.0.1:5000
+  }
+
+  handle {
+    reverse_proxy 127.0.0.1:8081
+  }
+
+  log {
+    output file /var/log/caddy/epci.log
+  }
+}
+
+epreuve-pratique-ci-cd.alexigallonet.com {
+  encode zstd gzip
+
+  @api path /api/*
+  handle @api {
+    reverse_proxy 127.0.0.1:5000
+  }
+
+  handle {
+    reverse_proxy 127.0.0.1:8081
+  }
+
+  log {
+    output file /var/log/caddy/epci.log
+  }
+}
+
+chess.alexigallonet.com {
+      encode zstd gzip
+      reverse_proxy localhost:8000
+      log {
+          output file /var/log/caddy/chess.log
+      }
+  }
+
+ml-federated-learning.uncc.alexigallonet.com {
+    encode zstd gzip
+    reverse_proxy localhost:8420
+    log {
+        output file /var/log/caddy/ml-federated-learning.log
+    }
+}
+
+
+
+
+# Refer to the Caddy docs for more information:
+# https://caddyserver.com/docs/caddyfile

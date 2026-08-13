@@ -36,16 +36,20 @@ below, which are not features.
 | 3 | Project page — validity domain, contributors, prediction, export, settings | ✅ done |
 | 4 | Discovery — faceted search and "match my file" | ✅ done |
 | 5 | Contribution flow, owner review, retrain, access grant | ✅ done |
-| 5b | Federated contribution mode | ⬜ not started |
+| 5b | Federated contribution mode | ✅ done |
 | 6 | Handover docs and invariant tests | 🔨 continuous |
 
-Lot 5b is the intended first casualty if time runs out, and that is a
-deliberate choice rather than an oversight: **the federated code already exists
-and works** — the algebra, the exactness tests, the aggregation logic. It needs
-re-plumbing into the new architecture, not reinventing. It is preserved in
-[`legacy/`](legacy/), which is the entire pre-rebuild site, kept on disk rather
-than left to git archaeology. Start with `legacy/README.md` and
-`legacy/server/piml.py`, and see ARCHITECTURE.md §5.
+Lot 5b was planned as the first casualty if time ran out — not an oversight but
+a judgement that **the federated code already existed and worked**, and needed
+re-plumbing rather than reinventing. Time did not run out, and it is built. The
+pre-rebuild site is still kept whole in [`legacy/`](legacy/) rather than left to
+git archaeology: `legacy/web/js/linalg.js` and `score.js` are where the
+browser-side algebra came from, and `legacy/README.md` explains the original
+federated design in detail.
+
+**Every lot in this plan is now built.** What stands between the current state
+and a public deployment is the blockers below, which are legal, institutional
+and operational rather than features.
 
 ---
 
@@ -222,10 +226,10 @@ file would validate a model against data from the very lab it was trained on.
 offset scores 0.17 against 0.63 for ordinary cross-validation, while labs that
 agree give 0.997 against 0.997.
 
-Note what is written but not yet reachable: `_reference_statistics` merges
-federated sufficient statistics into the reference fit, and no interface
-produces them until lot 5b. The arithmetic is covered by
-`tests/check_aggregation.py` rather than by an end-to-end path.
+`_reference_statistics` merges federated sufficient statistics into the
+reference fit. Nothing produced them until lot 5b; there is now an end-to-end
+path and `tests/smoke_lot5b.py` walks it, alongside the arithmetic check in
+`tests/check_aggregation.py`.
 
 ## What lot 3 adds
 
@@ -371,6 +375,57 @@ Two things worth knowing about the shape of this:
   is still earned and leaves it in place while reporting a revocation. This was
   a real bug during the build, caught by the smoke test rather than by reading,
   and the docstring now says so.
+
+## What lot 5b adds
+
+The mode the original site was built around: contributing without handing over
+the data. The file is read **in the contributor's browser**
+(`web/src/lib/federated.ts`) and only `n`, `D'D`, `D'y` and `y'y` per target are
+transmitted. No measurement passes through `lib/api.ts`.
+
+The claim this rests on is now checked end to end rather than only in the
+abstract. `tests/smoke_lot5b.py` builds two projects from identical
+measurements — one receiving half as a file and half as sums, the other
+receiving all twenty rows as one file — and compares their published
+coefficients: **3e-11 apart on a scale of 600**. That is the §5.1 claim
+surviving HTTP, JSONB and a background retrain, not just the arithmetic.
+
+Three things worth knowing about how it is built:
+
+- **The sums are checked, not trusted.** The client computes them and the server
+  cannot see the data behind them, so `api/services/federated.py` verifies what
+  must be true of any real dataset: `D'D` symmetric and positive semi-definite,
+  `D'D[0,0]` equal to the row count, the three sums mutually consistent (they
+  must not imply a negative residual sum of squares), and the declared input
+  ranges compatible with the means and variances the sums encode. A fabricated
+  validity range is caught by Popoviciu's inequality. Every one of these has a
+  test that submits a doctored summary and expects a refusal.
+- **The scores are recomputed server-side.** §5.3 notes that `SSE(theta)` is
+  expressible in the sums, so the transfer score is derived rather than
+  accepted — a contributor cannot flatter their own submission. The refit score
+  is honestly weaker here and says so in the payload: fitting on the sums is
+  exact, but cross-validating is not possible, because leave-one-out removes
+  points one at a time and summed statistics cannot. It reports a *training*
+  score and labels it as one.
+- **The double-counting trap is closed by construction, not by discipline.**
+  ARCHITECTURE.md §5.5 warns that a federated contributor who later shares their
+  file must remain one row whose mode changes. So the ordinary upload endpoint
+  **refuses** a file from someone who already has a federated contribution here,
+  and names the conversion route instead; `.../contributions/{id}/share` deletes
+  the summaries as it attaches the dataset. The test asserts the outcome that
+  matters: after converting, the project holds twenty rows, not thirty, and the
+  coefficients still match the pooled fit exactly.
+
+The incentive survives intact and is tested from both sides: an accepted
+federated contribution is credited publicly, widens the published validity
+domain, appears in the version lineage and feeds the reference model — and
+grants **no** model access. Sharing the file later does, immediately.
+
+One deliberate limit: federated mode accepts CSV and tab-separated text, not
+`.xlsx`. Unpacking a spreadsheet in the browser needs a library, and this page
+loads no third-party code on purpose — that is what lets a contributor read it
+and satisfy themselves nothing leaves. The page says so and offers the shared
+path instead, where the server does the reading.
 
 ## Known gaps and deliberate omissions
 

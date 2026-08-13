@@ -32,6 +32,64 @@ registry plus a demo project. A demo account is created with a published
 password — fine locally, unacceptable in production, and noted as such in the
 roadmap.
 
+## Develop it
+
+The contract above rebuilds the front end inside the image on every change,
+which is right for running the site and miserable for editing it. For a
+live-reloading loop, run the database in Docker and the two servers on the host.
+
+Start with the database alone — compose already exposes it on `127.0.0.1:5432`:
+
+```bash
+docker compose up -d db
+```
+
+Then the API, from the repository root:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
+pip install -r api/requirements.txt
+
+alembic upgrade head               # same settings the app reads, see api/migrations/env.py
+python -m api.seed                 # registry and demo project; no-op if already populated
+uvicorn api.main:app --reload --port 8000
+```
+
+One thing has to change from the compose defaults: inside compose the database
+host is `db`, and from the host it is `127.0.0.1`. Put it in `.env` (copied from
+`.env.example`):
+
+```
+MLFL_DATABASE_URL=postgresql+psycopg://mlfl:mlfl@127.0.0.1:5432/mlfl
+```
+
+That is safe to leave there — real environment variables win over `.env`, and
+`docker-compose.yml` sets `MLFL_DATABASE_URL` explicitly, so the containerised
+run keeps pointing at `db`.
+
+Then the front end:
+
+```bash
+cd web
+npm ci                             # installs the lockfile exactly; `npm install` may drift
+npm run dev
+```
+
+Work at <http://localhost:5173>, not :8000. Vite proxies `/api` to
+`http://127.0.0.1:8000` (`VITE_API_TARGET` overrides the target), which
+reproduces the single origin of the built image: the session cookie stays
+first-party and there is no CORS to configure — and therefore none to get wrong
+in development and discover in production. In this mode the API on :8000 serves
+JSON only, since `web/dist` does not exist; a non-API path there answers with a
+404 saying so rather than with the site. `/api/docs` is the generated API
+reference.
+
+Before committing, `npm run typecheck` in `web/`, and the smoke tests in
+[tests/README.md](tests/README.md) — those run against a live site over HTTP at
+`localhost:8000`, which the `uvicorn` above satisfies just as well as the
+container does.
+
 ## Documents
 
 | | |

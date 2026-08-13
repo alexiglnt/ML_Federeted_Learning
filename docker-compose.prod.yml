@@ -1,0 +1,60 @@
+# Production deployment on a VPS where Caddy already runs as a system
+# service for other sites (see the Caddyfile at the repo root, which mirrors
+# /etc/caddy/Caddyfile on the server). The app is therefore never bound to a
+# public interface: it only listens on 127.0.0.1, and the system Caddy is the
+# sole entry point from the Internet, terminating TLS and reverse-proxying in.
+#
+# Usage, on the server:
+#   cp .env.example .env
+#   nano .env                 # set MLFL_ENVIRONMENT=production, MLFL_SECRET_KEY,
+#                              # POSTGRES_PASSWORD (see comments in .env.example)
+#   sudo docker compose -f docker-compose.prod.yml up -d --build
+#
+# Updating later:
+#   git pull
+#   sudo docker compose -f docker-compose.prod.yml up -d --build
+#
+# If port 8420 is already used by another site on this server, check with
+# `sudo ss -tlnp`, then change it both below and in the matching Caddyfile
+# block.
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: mlfl
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: mlfl
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mlfl -d mlfl"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    # No published port: only the `app` service on this Docker network needs
+    # to reach the database.
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      # Overrides whatever MLFL_DATABASE_URL is in .env, so the password
+      # can't drift between what Postgres was given above and what the app
+      # connects with.
+      MLFL_DATABASE_URL: postgresql+psycopg://mlfl:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/mlfl
+    volumes:
+      - app_data:/app/var/data
+    ports:
+      # Loopback only — Caddy (system service) reverse-proxies to this port.
+      # Never publish this on 0.0.0.0 on a server that also runs Caddy.
+      - "127.0.0.1:8420:8000"
+
+volumes:
+  db_data:
+  app_data:

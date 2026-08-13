@@ -14,6 +14,7 @@ python tests/smoke_lot2b.py       # training: versions, lineage, who sees the mo
 python tests/smoke_lot3.py        # project page: validity domain, prediction, export, audit
 python tests/smoke_lot4.py        # discovery: facets, and ranking projects against a file
 python tests/smoke_lot5.py        # review: the two scores, access granted and taken away
+python tests/smoke_lot5b.py       # federated: exactness, and the double-counting trap
 
 # Inside the container — these need numpy and the api package, not a server.
 docker compose exec app python tests/check_aggregation.py
@@ -109,7 +110,23 @@ coverage. Specifically:
   case that decides whether a real file finds anything;
 - a heading no registry quantity claims is reported rather than dropped, which
   is how a user finds out the registry is missing a quantity;
-- unlisted projects appear in neither faceted search nor file matching.
+- unlisted projects appear in neither faceted search nor file matching;
+- **fitting from summed statistics equals fitting on the pooled rows, end to
+  end.** Two projects are built from the same twenty measurements, one receiving
+  ten of them as a file and ten as sums, and their published coefficients agree
+  to 3e-11 on a scale of 600. `check_aggregation.py` proves the arithmetic in
+  isolation; this proves it survives HTTP, JSONB and a background retrain;
+- doctored sufficient statistics are refused: a design matrix of the wrong
+  width, an asymmetric `D'D`, a `D'D[0,0]` that disagrees with the row count,
+  three sums implying a negative residual sum of squares, and a fabricated
+  validity range that the sums contradict. The server cannot see the data, so
+  these checks are the whole defence against a poisoned reference model;
+- an accepted **federated** contribution is credited, widens the published
+  domain and feeds the reference model, while granting no model access. If that
+  ever inverts, sharing data stops being worth anything;
+- converting a federated contribution to shared leaves the project holding
+  twenty rows rather than thirty, and its coefficients still equal the pooled
+  fit — the §5.5 double count, checked where it would actually show.
 
 **They write to the database they run against.** Accounts and projects are
 tagged with a random suffix so repeated runs do not collide, but they
@@ -124,8 +141,18 @@ docker compose down -v && docker compose up -d --build
 
 ## Still to write
 
-One invariant cannot be tested until the code it guards exists: switching a
-contribution from federated to shared must not double-count its data
-(ARCHITECTURE.md §5.5, lot 5b). The arithmetic underneath it — that `subtract`
-exactly undoes `add` — is already checked, so what remains is the end-to-end
-path once federated contributions can actually be made.
+Nothing in ARCHITECTURE.md §8 is now untested. The last one outstanding —
+switching a contribution from federated to shared must not double-count its data
+(§5.5) — became testable when lot 5b was built and is covered by
+`smoke_lot5b.py`, which converts a contribution and then asserts both the row
+count and the published coefficients.
+
+What these tests still do **not** cover, and a successor should know it:
+
+- the front end. There is no browser-driven test, so the JavaScript that
+  computes sufficient statistics is exercised only by `smoke_lot5b.py`
+  recomputing the same sums in Python and submitting them over HTTP. The
+  contract is checked; the TypeScript implementing it in the browser is not;
+- concurrency. Two simultaneous retrains, or a review racing a withdrawal, are
+  guarded by a check-and-return rather than by a lock;
+- anything about how the site behaves under load.

@@ -42,6 +42,10 @@ from api.models import (
     ContributionMode,
     ContributionStatus,
     Dataset,
+    FederatedStats,
+    FittedModel,
+    ModelTrack,
+    ModelVersion,
     Project,
     ProjectInput,
     ProjectStatus,
@@ -55,13 +59,14 @@ from api.schemas import (
     ContributionOut,
     ContributionReview,
     DatasetCommit,
+    FederatedCommit,
     MappingSuggestion,
     ReviewResult,
     TrainingJobOut,
     UploadPreview,
     ValidationOut,
 )
-from api.services import scoring, storage, training
+from api.services import federated, scoring, storage, training
 from api.services.dataset import build_and_validate
 from api.services.matching import approved_variables, suggest_mapping
 from api.services.tabular import ParseError, numeric_columns, parse_upload
@@ -170,12 +175,36 @@ def commit_dataset(
     project = _load_project(db, slug)
 
     if payload.mode == ContributionMode.FEDERATED:
-        # The federated path computes sufficient statistics in the browser and
-        # never uploads the file at all, so it does not come through here.
+        # The federated path computes its sufficient statistics in the browser
+        # and never uploads a file at all, so it does not come through here.
         raise HTTPException(
-            status.HTTP_501_NOT_IMPLEMENTED,
-            "Contributing without sharing your file is not built yet (lot 5b). "
-            "See ROADMAP.md.",
+            status.HTTP_400_BAD_REQUEST,
+            "A federated contribution is made by POSTing summary statistics to "
+            ".../federated, not by uploading a file.",
+        )
+
+    # ⚠️ ARCHITECTURE.md §5.5. A contributor who sent sums and now shares their
+    # file must *convert* that contribution, not create a second one — otherwise
+    # the same measurements enter the reference model twice, once through the
+    # sums and once through the rows, and nothing about the result looks broken.
+    # Refusing here is what makes the trap unreachable rather than merely
+    # documented.
+    existing_federated = db.scalar(
+        select(Contribution).where(
+            Contribution.project_id == project.id,
+            Contribution.contributor_id == user.id,
+            Contribution.mode == ContributionMode.FEDERATED,
+            Contribution.status != ContributionStatus.WITHDRAWN,
+        )
+    )
+    if existing_federated is not None:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"You already have a federated contribution to this project "
+            f"(#{existing_federated.id}). Upload your file to "
+            f".../contributions/{existing_federated.id}/share to convert it, "
+            f"which replaces its summary statistics with the rows. If this is "
+            f"genuinely different data, withdraw that contribution first.",
         )
 
     try:
@@ -308,6 +337,306 @@ def commit_dataset(
         refit_score=contribution.refit_score,
         reviewed_at=contribution.reviewed_at,
         review_note=contribution.review_note,
+    )
+
+
+@router.post(
+    "/federated", response_model=ContributionOut, status_code=status.HTTP_201_CREATED
+)
+def commit_federated(
+    slug: str,
+    payload: FederatedCommit,
+    background: BackgroundTasks,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Contribute summary statistics instead of measurements.
+
+    This is the mode the original site was built around: the fitting runs in the
+    contributor's browser and only ``n``, ``D'D``, ``D'y`` and ``y'y`` are
+    transmitted. Those four are additive across labs, so the reference model is
+    refitted **exactly** — not averaged — as if the pooled rows had been
+    available (ARCHITECTURE.md §5.1).
+
+    What this mode does and does not buy, stated plainly because the interface
+    has to say it too (§4): the contributor is credited, their data widens the
+    published validity domain, and it feeds the reference model. It does **not**
+    feed the main model — a Gaussian process has no summary that could carry it
+    — and it does **not** unlock model access. Access is the counterpart of
+    sharing data, and no data was shared.
+    """
+    project = _load_project(db, slug)
+    if project.status == ProjectStatus.ARCHIVED:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "This project is archived and is not taking data."
+        )
+    if not project.accepts_federated:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "This project does not accept contributions made without sharing data.",
+        )
+
+    inputs = sorted(project.inputs, key=lambda item: item.position)
+    feature_keys = [item.variable.key for item in inputs]
+    targets_by_key = {item.variable.key: item for item in project.targets}
+
+    unknown = set(payload.stats) - set(targets_by_key)
+    if unknown:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            f"Not a target of this project: {', '.join(sorted(unknown))}.",
+        )
+
+    problems: list[str] = []
+    for key, summary in payload.stats.items():
+        problems.extend(
+            f"{key}: {problem}"
+            for problem in federated.validate(
+                summary.model_dump(),
+                n_features=len(feature_keys),
+                feature_ranges=payload.feature_ranges,
+                feature_keys=feature_keys,
+                min_rows=settings.min_contribution_rows,
+            )
+        )
+    if problems:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "These summary statistics cannot be accepted:\n" + "\n".join(problems),
+        )
+
+    # Scores are derived here rather than trusted from the client: SSE(theta) is
+    # expressible in the sums, so the server can compute the transfer score
+    # itself and a contributor cannot flatter their own submission (§5.3).
+    latest = db.scalar(
+        select(ModelVersion)
+        .where(ModelVersion.project_id == project.id)
+        .options(selectinload(ModelVersion.fitted_models))
+        .order_by(ModelVersion.number.desc())
+        .limit(1)
+    )
+    published: dict[str, FittedModel] = {}
+    if latest is not None:
+        for model in latest.fitted_models:
+            for key, target in targets_by_key.items():
+                # The reference track is the one a summary can be judged
+                # against; the main model may have no closed form at all.
+                if model.target_variable_id == target.variable_id and (
+                    model.track == ModelTrack.REFERENCE or key not in published
+                ):
+                    published[key] = model
+
+    stats_payload = {key: value.model_dump() for key, value in payload.stats.items()}
+    transfer, refit = federated.scores_from_stats(
+        project, stats_payload, published, feature_keys,
+        version_number=latest.number if latest else None,
+    )
+
+    is_owner = project.owner_id == user.id
+    n_rows = max(summary.n for summary in payload.stats.values())
+    contribution = Contribution(
+        project_id=project.id,
+        contributor_id=user.id,
+        mode=ContributionMode.FEDERATED,
+        status=ContributionStatus.ACCEPTED if is_owner else ContributionStatus.PENDING,
+        n_rows=n_rows,
+        measurement_method=payload.measurement_method,
+        notes=payload.notes,
+        feature_ranges={
+            key: [float(bounds[0]), float(bounds[1])]
+            for key, bounds in payload.feature_ranges.items()
+            if key in feature_keys and len(bounds) == 2
+        },
+        transfer_score=transfer,
+        refit_score=refit,
+        reviewed_at=utcnow() if is_owner else None,
+        reviewed_by_id=user.id if is_owner else None,
+    )
+    db.add(contribution)
+    db.flush()
+
+    for key, summary in payload.stats.items():
+        db.add(
+            FederatedStats(
+                contribution_id=contribution.id,
+                target_variable_id=targets_by_key[key].variable_id,
+                n=summary.n,
+                dtd=summary.dtd,
+                dty=summary.dty,
+                yty=summary.yty,
+            )
+        )
+
+    db.add(
+        AuditLog(
+            actor_id=user.id,
+            action="federated.submit",
+            object_type="contribution",
+            object_id=contribution.id,
+            detail={"project": project.slug, "n_rows": n_rows,
+                    "targets": sorted(payload.stats)},
+        )
+    )
+
+    job_id = None
+    if contribution.status == ContributionStatus.ACCEPTED:
+        job_id = training.queue_training(db, project.id, kind="federated-added").id
+    db.commit()
+
+    if job_id is not None:
+        background.add_task(training.run_job, SessionLocal, job_id)
+
+    db.refresh(contribution)
+    return _contribution_out(project, contribution, user.full_name)
+
+
+@router.post("/contributions/{contribution_id}/share", response_model=ReviewResult)
+def share_federated_contribution(
+    slug: str,
+    contribution_id: int,
+    payload: DatasetCommit,
+    background: BackgroundTasks,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Turn a federated contribution into a shared one, in place.
+
+    ⚠️ **This is the double-counting trap of ARCHITECTURE.md §5.5.** A
+    contributor who sent sums and later shares their file must remain **one row
+    whose mode changes**, never two rows. If a second row were created, the same
+    measurements would enter the reference model twice — once through the sums,
+    once through the rows — and the model would simply be wrong with nothing
+    visibly broken.
+
+    Here the summaries are deleted as the dataset is attached, so the pool is
+    rebuilt from the rows alone at the next retrain. `pool_shared_data` selects
+    on `mode == SHARED` and `_reference_statistics` on `mode == FEDERATED`, so
+    one row can never be counted on both paths — but only because this endpoint
+    moves the mode and drops the statistics together.
+
+    Sharing is also what earns model access, so an accepted contribution that
+    converts unlocks the model on the spot.
+    """
+    project = _load_project(db, slug)
+    contribution = db.get(Contribution, contribution_id)
+    if contribution is None or contribution.project_id != project.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such contribution.")
+    if contribution.contributor_id != user.id:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Only the contributor can share their own data.",
+        )
+    if contribution.mode != ContributionMode.FEDERATED:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "This contribution already includes its data."
+        )
+    if contribution.status == ContributionStatus.WITHDRAWN:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "This contribution has been withdrawn."
+        )
+
+    try:
+        data, original_filename = storage.claim(
+            payload.upload_token, project_id=project.id, user_id=user.id
+        )
+    except LookupError as error:
+        raise HTTPException(status.HTTP_410_GONE, str(error)) from error
+
+    try:
+        table = parse_upload(original_filename, data)
+    except ParseError as error:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(error)) from error
+
+    built = build_and_validate(
+        project, table, payload.mapping, min_rows=settings.min_contribution_rows
+    )
+    if not built.report.ok:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "This file cannot be used yet:\n" + "\n".join(built.report.errors),
+        )
+
+    digest = storage.content_hash(data)
+    clash = db.scalar(
+        select(Dataset)
+        .join(Contribution, Dataset.contribution_id == Contribution.id)
+        .where(
+            Contribution.project_id == project.id,
+            Dataset.content_hash == digest,
+            Contribution.status != ContributionStatus.WITHDRAWN,
+        )
+    )
+    if clash is not None:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "This exact file has already been submitted to this project.",
+        )
+
+    # The two must move together. Deleting the statistics is not tidying up:
+    # leaving them behind while the mode changes is the double count.
+    for entry in list(contribution.federated_stats):
+        db.delete(entry)
+    contribution.federated_stats = []
+    contribution.mode = ContributionMode.SHARED
+    contribution.n_rows = built.report.n_rows_usable
+    contribution.feature_ranges = built.report.feature_ranges
+    if payload.measurement_method:
+        contribution.measurement_method = payload.measurement_method
+    if payload.notes:
+        contribution.notes = payload.notes
+
+    path = storage.store_dataset(
+        data, project_id=project.id, suffix=Path(original_filename).suffix.lower()
+    )
+    db.add(
+        Dataset(
+            contribution_id=contribution.id,
+            original_filename=original_filename,
+            stored_path=storage.relative_path(path),
+            content_hash=digest,
+            n_rows=built.report.n_rows_usable,
+            n_cols=len(table.columns),
+            column_mapping=payload.mapping,
+            parse_report={**table.report(), "validation": built.report.to_dict()},
+        )
+    )
+    db.flush()
+
+    # Sharing is what earns access — but only for data that is actually in.
+    granted = False
+    if contribution.status == ContributionStatus.ACCEPTED:
+        granted = grant_contributor_access(
+            db, project, contribution.contributor_id, contribution.id
+        )
+
+    db.add(
+        AuditLog(
+            actor_id=user.id,
+            action="contribution.share",
+            object_type="contribution",
+            object_id=contribution.id,
+            detail={"project": project.slug, "filename": original_filename,
+                    "n_rows": contribution.n_rows},
+        )
+    )
+
+    job_id = None
+    if contribution.status == ContributionStatus.ACCEPTED:
+        job_id = training.queue_training(db, project.id, kind="contribution-shared").id
+    db.commit()
+    storage.discard(payload.upload_token)
+
+    job = db.get(TrainingJob, job_id) if job_id else None
+    if job_id is not None:
+        background.add_task(training.run_job, SessionLocal, job_id)
+
+    db.refresh(contribution)
+    return ReviewResult(
+        contribution=_contribution_out(project, contribution, user.full_name),
+        access_granted=granted,
+        training_job=(
+            TrainingJobOut(id=job.id, status=job.status, kind=job.kind) if job else None
+        ),
     )
 
 

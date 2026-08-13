@@ -105,6 +105,11 @@ export default function ReviewCard({
   // The guide reads on the worst target rather than the best: a contribution is
   // only as trustworthy as its weakest quantity, and averaging would hide a
   // target that is pure noise behind one that is fine.
+  const refitOf = (key: string) => {
+    const entry = refit?.per_target?.[key];
+    return entry?.r2_cv ?? entry?.r2_train;
+  };
+
   const worst = (pick: (key: string) => number | null | undefined): number | null => {
     const values = targets
       .map(pick)
@@ -169,11 +174,23 @@ export default function ReviewCard({
                     <td className={`score-cell ${verdict(t?.r2)}`}>
                       {t?.error ? <span className="muted small">{t.error}</span> : score(t?.r2)}
                     </td>
-                    <td className={`score-cell ${verdict(r?.r2_cv)}`}>
+                    {/* A federated contribution has no cross-validated refit:
+                        leave-one-out removes points one at a time and summed
+                        statistics cannot. The training score is shown instead,
+                        labelled, rather than an empty cell. */}
+                    <td className={`score-cell ${verdict(r?.r2_cv ?? r?.r2_train)}`}>
                       {r?.error ? (
                         <span className="muted small">{r.error}</span>
                       ) : (
-                        score(r?.r2_cv)
+                        <>
+                          {score(r?.r2_cv ?? r?.r2_train)}
+                          {r?.r2_cv === undefined && r?.r2_train !== undefined && (
+                            <>
+                              <br />
+                              <span className="hint">training only</span>
+                            </>
+                          )}
+                        </>
                       )}
                     </td>
                   </tr>
@@ -192,9 +209,11 @@ export default function ReviewCard({
         </p>
       )}
 
+      {refit?.note && <p className="muted small">{refit.note}</p>}
+
       <Reading
         transfer={worst((key) => transfer?.per_target?.[key]?.r2)}
-        refit={worst((key) => refit?.per_target?.[key]?.r2_cv)}
+        refit={worst(refitOf)}
       />
 
       <div className="field-row wide">

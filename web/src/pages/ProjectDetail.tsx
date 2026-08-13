@@ -482,6 +482,17 @@ export default function ProjectDetail() {
                             Remove from model
                           </button>
                         )}
+                        {/* Converting rather than uploading again: the same row
+                            changes mode, so the data cannot be counted twice
+                            (ARCHITECTURE.md §5.5). */}
+                        {!isOwner && item.mode === "federated" && item.status !== "withdrawn" && (
+                          <Link
+                            to={`/projects/${project.slug}/upload?share=${item.id}`}
+                            className="ghost button-like tiny-button"
+                          >
+                            Share the file
+                          </Link>
+                        )}
                         {!isOwner &&
                           (item.status === "pending" || item.status === "accepted") && (
                             <button

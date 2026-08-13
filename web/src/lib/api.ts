@@ -236,7 +236,29 @@ export interface VariableProposalPayload {
   aliases?: string[];
 }
 
+export interface ColumnMatchOut {
+  column: string;
+  normalised: string;
+  matches: {
+    variable: Variable;
+    confidence: number;
+    exact: boolean;
+    unit_conflict: string | null;
+  }[];
+}
+
 export const variables = {
+  /** Suggest a registry quantity per column heading.
+   *
+   *  Used by the federated path, where the file itself never leaves the
+   *  machine: only the *headings* are sent. A column name is not a
+   *  measurement, and reimplementing the registry matcher in the browser would
+   *  guarantee it drifted from the server's. */
+  match: (columns: string[]) => {
+    const params = new URLSearchParams();
+    for (const column of columns) params.append("columns", column);
+    return api.get<ColumnMatchOut[]>(`/variables/match?${params}`);
+  },
   list: (query?: { q?: string; dimension?: string }) => {
     const params = new URLSearchParams();
     if (query?.q) params.set("q", query.q);
@@ -458,7 +480,17 @@ export interface RefitScore {
   engine: string | null;
   per_target: Record<
     string,
-    { r2_cv?: number | null; rmse_cv?: number | null; cv_scheme?: string; n?: number; error?: string }
+    {
+      r2_cv?: number | null;
+      rmse_cv?: number | null;
+      /** Federated only. Summed statistics cannot be resampled, so there is no
+       *  cross-validated figure — this is a training score and says so. */
+      r2_train?: number | null;
+      rmse_train?: number | null;
+      cv_scheme?: string;
+      n?: number;
+      error?: string;
+    }
   >;
   note?: string | null;
 }
@@ -539,6 +571,44 @@ export const uploads = {
   withdraw: (slug: string, contributionId: number) =>
     api.post<ReviewResult>(
       `/projects/${encodeURIComponent(slug)}/contributions/${contributionId}/withdraw`,
+    ),
+  /** Contribute without transmitting any measurement.
+   *
+   *  The payload carries only the sums computed in `lib/federated.ts`, plus the
+   *  ranges of each input and the column names the user confirmed. No row of
+   *  the file reaches this function. */
+  federated: (
+    slug: string,
+    payload: {
+      stats: Record<string, { n: number; dtd: number[][]; dty: number[]; yty: number }>;
+      feature_ranges: Record<string, [number, number]>;
+      column_mapping?: Record<string, string>;
+      measurement_method?: string;
+      notes?: string;
+    },
+  ) =>
+    api.post<ContributionOut>(
+      `/projects/${encodeURIComponent(slug)}/federated`,
+      payload,
+    ),
+  /** Turn an existing federated contribution into a shared one, in place.
+   *
+   *  ⚠️ Never a second contribution — see ARCHITECTURE.md §5.5. The server
+   *  drops the summary statistics as it attaches the file, so the data cannot
+   *  be counted twice. */
+  share: (
+    slug: string,
+    contributionId: number,
+    payload: {
+      upload_token: string;
+      mapping: Record<string, string>;
+      measurement_method?: string;
+      notes?: string;
+    },
+  ) =>
+    api.post<ReviewResult>(
+      `/projects/${encodeURIComponent(slug)}/contributions/${contributionId}/share`,
+      payload,
     ),
 };
 

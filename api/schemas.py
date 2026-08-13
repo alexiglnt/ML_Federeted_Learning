@@ -259,6 +259,41 @@ class ContributionReview(BaseModel):
     note: str | None = Field(default=None, max_length=4000)
 
 
+class SufficientStatisticsIn(BaseModel):
+    """One target's summary, as computed in the contributor's browser.
+
+    ``D'D``, ``D'y``, ``y'y`` and ``n`` with ``D = [1, X]`` and the inputs in
+    the project's declared order. That order is contractual: a permuted design
+    matrix fits silently wrong coefficients, and here there is no file to
+    re-read afterwards to notice.
+    """
+
+    n: int = Field(ge=1)
+    dtd: list[list[float]]
+    dty: list[float]
+    yty: float
+
+
+class FederatedCommit(BaseModel):
+    """A contribution made without transmitting any measurement.
+
+    The counterpart of `DatasetCommit`. What arrives is the summary above, per
+    target, plus the ranges of the inputs — which is what grows the published
+    validity domain and is the only description of the data the project ever
+    gets.
+    """
+
+    #: {target_variable_key: summary}
+    stats: dict[str, SufficientStatisticsIn] = Field(min_length=1)
+    #: {input_variable_key: [min, max]}, over the rows behind the summary.
+    feature_ranges: dict[str, list[float]] = Field(default_factory=dict)
+    #: Echoed back so the interface can show what the browser matched. The
+    #: column *names* leave the machine; the measurements never do.
+    column_mapping: dict[str, str] = Field(default_factory=dict)
+    measurement_method: str | None = Field(default=None, max_length=60)
+    notes: str | None = Field(default=None, max_length=4000)
+
+
 class ContributorOut(BaseModel):
     """Public credit for a contribution.
 

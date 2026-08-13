@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from api.config import settings
@@ -149,6 +149,29 @@ def pool_shared_data(db: Session, project: Project) -> PooledData:
     return PooledData(feature_keys, per_target, used, n_rows)
 
 
+def federated_contribution_ids(db: Session, project: Project) -> list[int]:
+    """Accepted federated contributions whose statistics feed this project.
+
+    Needed for the lineage: a federated contributor is credited exactly like
+    anyone else (§4), so their contribution has to appear among a version's
+    sources. Without this they would feed the reference model and then be absent
+    from the record of what made it — which is the one place a reader looks to
+    find out whose data a model rests on.
+    """
+    return list(
+        db.scalars(
+            select(Contribution.id)
+            .join(FederatedStats, FederatedStats.contribution_id == Contribution.id)
+            .where(
+                Contribution.project_id == project.id,
+                Contribution.status == ContributionStatus.ACCEPTED,
+                Contribution.mode == ContributionMode.FEDERATED,
+            )
+            .distinct()
+        )
+    )
+
+
 def _reference_statistics(
     db: Session, project: Project, target_key: str, X: list, y: list
 ) -> tuple[dict, int]:
@@ -235,17 +258,30 @@ def train_project(db: Session, project_id: int, *, note: str | None = None) -> M
         .order_by(ModelVersion.number.desc())
         .limit(1)
     )
+
+    # Federated contributions feed the reference track only, but they are part
+    # of what made this version and are credited as such.
+    federated_ids = federated_contribution_ids(db, project)
+    federated_rows = int(
+        db.scalar(
+            select(func.coalesce(func.sum(Contribution.n_rows), 0)).where(
+                Contribution.id.in_(federated_ids)
+            )
+        )
+        or 0
+    ) if federated_ids else 0
+
     version = ModelVersion(
         project_id=project.id,
         number=(previous or 0) + 1,
         note=note,
-        n_rows_total=pooled.n_rows,
-        n_contributions=len(pooled.contribution_ids),
+        n_rows_total=pooled.n_rows + federated_rows,
+        n_contributions=len(pooled.contribution_ids) + len(federated_ids),
     )
     db.add(version)
     db.flush()
 
-    for contribution_id in pooled.contribution_ids:
+    for contribution_id in pooled.contribution_ids + federated_ids:
         db.add(
             ModelVersionSource(
                 model_version_id=version.id, contribution_id=contribution_id
