@@ -162,6 +162,109 @@ main.wrap {
   font-size: 0.9rem;
 }
 
+/* --------------------------------------------------------------------- */
+/* Notifications                                                         */
+/* --------------------------------------------------------------------- */
+.notification-bell {
+  position: relative;
+}
+.icon-button {
+  position: relative;
+  padding: 0.45rem;
+  line-height: 0;
+}
+.notification-count {
+  position: absolute;
+  top: -0.25rem;
+  right: -0.25rem;
+  background: var(--danger);
+  color: var(--danger-soft);
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0.2rem 0.35rem;
+  min-width: 1.1rem;
+  text-align: center;
+}
+
+.notification-dropdown {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  width: 20rem;
+  max-width: min(20rem, calc(100vw - 2rem));
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 0.75rem;
+  z-index: 20;
+}
+.notification-dropdown-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+.notification-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 22rem;
+  overflow-y: auto;
+}
+.notification-page-list {
+  list-style: none;
+  margin: 1.25rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.6rem;
+}
+.notification-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.55rem 0.7rem;
+  margin-bottom: 0.4rem;
+  font: inherit;
+  cursor: pointer;
+}
+.notification-list .notification-item:last-child {
+  margin-bottom: 0;
+}
+.notification-item.unread {
+  background: var(--accent-soft);
+  border-left: 3px solid var(--accent);
+}
+.notification-title {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.notification-body {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+.notification-time {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  margin-top: 0.1rem;
+}
+.notification-see-all {
+  display: block;
+  text-align: center;
+  font-size: 0.85rem;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border);
+}
+
 .site-footer {
   border-top: 1px solid var(--border);
   background: var(--surface);
@@ -543,6 +646,11 @@ label.mode-card input[type="radio"] {
 .badge.warn {
   background: var(--warn-soft);
   color: var(--warn);
+}
+/* A rejected contribution — a decision, not merely something to look at again. */
+.badge.danger {
+  background: var(--danger-soft);
+  color: var(--danger);
 }
 
 .warning-list {

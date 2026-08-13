@@ -439,13 +439,20 @@ path instead, where the server does the reading.
   simplification the original single-model site made, and it holds only while
   a project's targets are physically alike. A project predicting two quantities
   that respond oppositely to the same input needs this per target.
-- **No notification system.** An owner learns of a pending contribution only by
-  visiting the project page, and a contributor learns of a decision the same
-  way. Now that review is the step everything else waits on, this is the most
-  keenly felt gap in the build: a contribution can sit unseen indefinitely, and
-  the contributor has no way to tell whether it was ignored or rejected. The
-  review queue is put at the top of the project page to soften that, which is a
-  workaround and not a fix.
+- ~~No notification system.~~ **Closed.** A `notifications` table plus
+  `api/services/notifications.py` fire on the two events that used to go
+  unseen — a contribution submitted notifies the project owner, a review
+  decision (accept/reject) notifies the contributor, note included — surfaced
+  by a bell in the header (`NotificationBell.tsx`, polled every 45s) and the
+  full `/notifications` page. `Me.tsx` ("My work") now also shows every
+  contribution the signed-in user has made, every project they can use the
+  model of, and — for projects they own — the contributions waiting on their
+  review, via three new read-only `/api/me/*` endpoints. `withdraw` and
+  `share` still notify nobody, deliberately: both are the acting user's own
+  decision. See `tests/smoke_notifications.py`.
+  Deliberately still out of scope: notifications for variable-moderation
+  decisions (a proposer is not told when their variable is approved or
+  rejected), and any transport beyond the in-app bell (no email digest).
 - **Rejecting the last accepted contribution leaves the published model
   standing.** Retraining is queued, but it fails with "not enough accepted
   data" and there is no path that un-publishes an existing version. The model on

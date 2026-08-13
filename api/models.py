@@ -634,6 +634,50 @@ class TrainingJob(Base):
     project: Mapped[Project] = relationship()
 
 
+class NotificationKind(str, enum.Enum):
+    CONTRIBUTION_SUBMITTED = "contribution_submitted"  # -> project owner
+    CONTRIBUTION_ACCEPTED = "contribution_accepted"     # -> contributor
+    CONTRIBUTION_REJECTED = "contribution_rejected"     # -> contributor
+
+
+class Notification(Base):
+    """One event surfaced to one user — ROADMAP.md's "most keenly felt gap".
+
+    Without this, an owner learns of a pending contribution only by visiting
+    the project page, and a contributor learns of a decision the same way; a
+    contribution can sit unseen indefinitely. `title`/`body` are rendered once
+    at creation rather than re-derived at read time: a project can be renamed
+    after the notification is sent, and the notification should describe the
+    event as it happened, not as things stand now.
+    """
+
+    __tablename__ = "notifications"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    recipient_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    actor_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
+    kind: Mapped[NotificationKind] = mapped_column(
+        _enum(NotificationKind, "notification_kind"), index=True
+    )
+    project_id: Mapped[int | None] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE")
+    )
+    contribution_id: Mapped[int | None] = mapped_column(
+        ForeignKey("contributions.id", ondelete="CASCADE")
+    )
+    title: Mapped[str] = mapped_column(String(200))
+    body: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(TZDateTime, default=utcnow, index=True)
+    read_at: Mapped[datetime | None] = mapped_column(TZDateTime)
+
+    project: Mapped[Project | None] = relationship()
+    contribution: Mapped[Contribution | None] = relationship()
+
+
 class AuditLog(Base):
     """Who did what, notably who downloaded which raw file.
 
@@ -656,3 +700,4 @@ class AuditLog(Base):
 
 Index("ix_contributions_project_status", Contribution.project_id, Contribution.status)
 Index("ix_projects_material_process", Project.material, Project.process)
+Index("ix_notifications_recipient_read", Notification.recipient_id, Notification.read_at)

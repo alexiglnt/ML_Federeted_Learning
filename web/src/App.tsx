@@ -6,6 +6,7 @@ import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Me from "./pages/Me";
 import NotFound from "./pages/NotFound";
+import Notifications from "./pages/Notifications";
 import ProjectDetail from "./pages/ProjectDetail";
 import ProjectNew from "./pages/ProjectNew";
 import ProjectPredict from "./pages/ProjectPredict";
@@ -69,6 +70,14 @@ export default function App() {
           }
         />
         <Route path="variables" element={<Variables />} />
+        <Route
+          path="notifications"
+          element={
+            <RequireAuth>
+              <Notifications />
+            </RequireAuth>
+          }
+        />
         <Route path="login" element={<Login />} />
         <Route path="register" element={<Register />} />
         <Route

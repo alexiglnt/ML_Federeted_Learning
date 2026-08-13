@@ -541,6 +541,62 @@ class ReviewResult(BaseModel):
     training_job: TrainingJobOut | None = None
 
 
+# --------------------------------------------------------------------------- #
+# Notifications and the personal dashboard
+# --------------------------------------------------------------------------- #
+class NotificationOut(BaseModel):
+    """One event surfaced to one user. See `Notification` for why `title` and
+    `body` are stored rendered rather than rebuilt from the current project
+    state."""
+
+    id: int
+    kind: str
+    title: str
+    body: str | None
+    project_slug: str | None = None
+    contribution_id: int | None = None
+    created_at: datetime
+    read_at: datetime | None = None
+
+
+class MyContributionOut(BaseModel):
+    """One row of "contributions I've made", across every project."""
+
+    id: int
+    project_slug: str
+    project_title: str
+    mode: ContributionMode
+    status: ContributionStatus
+    n_rows: int
+    submitted_at: datetime
+    reviewed_at: datetime | None
+    review_note: str | None
+
+
+class MyAccessOut(BaseModel):
+    """One project I may use the model of, owned projects excluded — those are
+    already listed by `GET /api/projects/mine`."""
+
+    project_slug: str
+    project_title: str
+    role: str
+    granted_at: datetime
+
+
+class MyReviewQueueItem(BaseModel):
+    """One pending contribution awaiting my decision, across every project I
+    own. A summary for the dashboard — the full accept/reject flow with the
+    two §5.3 scores lives on the project page itself."""
+
+    project_slug: str
+    project_title: str
+    contribution_id: int
+    contributor_name: str
+    mode: ContributionMode
+    n_rows: int
+    submitted_at: datetime
+
+
 class ProjectDetail(ProjectSummary):
     description: str | None
     visibility: ProjectVisibility

@@ -67,7 +67,7 @@ from api.schemas import (
     UploadPreview,
     ValidationOut,
 )
-from api.services import federated, poolability, scoring, storage, training
+from api.services import federated, notifications, poolability, scoring, storage, training
 from api.services.dataset import build_and_validate
 from api.services.matching import approved_variables, suggest_mapping
 from api.services.tabular import ParseError, numeric_columns, parse_upload
@@ -295,6 +295,11 @@ def commit_dataset(
     if is_owner and project.status == ProjectStatus.DRAFT:
         project.status = ProjectStatus.ACTIVE
 
+    if not is_owner:
+        notifications.notify_contribution_submitted(
+            db, project, contribution, user.full_name
+        )
+
     db.add(
         AuditLog(
             actor_id=user.id,
@@ -466,6 +471,11 @@ def commit_federated(
                 dty=summary.dty,
                 yty=summary.yty,
             )
+        )
+
+    if not is_owner:
+        notifications.notify_contribution_submitted(
+            db, project, contribution, user.full_name
         )
 
     db.add(
@@ -930,6 +940,7 @@ def review_contribution(
         new_status=wanted, actor=user, note=payload.note,
         action=f"contribution.{payload.decision}",
     )
+    notifications.notify_review_decision(db, project, contribution, user)
     db.commit()
     db.refresh(contribution)
 

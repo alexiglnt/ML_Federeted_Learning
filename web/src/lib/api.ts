@@ -755,4 +755,72 @@ export const modelsApi = {
     ),
 };
 
+export type NotificationKind =
+  | "contribution_submitted"
+  | "contribution_accepted"
+  | "contribution_rejected";
+
+export interface NotificationOut {
+  id: number;
+  kind: NotificationKind;
+  title: string;
+  body: string | null;
+  project_slug: string | null;
+  contribution_id: number | null;
+  created_at: string;
+  read_at: string | null;
+}
+
+export const notifications = {
+  list: (opts?: { unreadOnly?: boolean; limit?: number }) => {
+    const params = new URLSearchParams();
+    if (opts?.unreadOnly) params.set("unread_only", "true");
+    if (opts?.limit) params.set("limit", String(opts.limit));
+    const query = params.toString();
+    return api.get<NotificationOut[]>(`/notifications${query ? `?${query}` : ""}`);
+  },
+  unreadCount: () => api.get<{ count: number }>("/notifications/unread-count"),
+  markRead: (id: number) => api.post<NotificationOut>(`/notifications/${id}/read`),
+  markAllRead: () => api.post<{ count: number }>("/notifications/read-all"),
+};
+
+/** One row of "contributions I've made", across every project. */
+export interface MyContribution {
+  id: number;
+  project_slug: string;
+  project_title: string;
+  mode: "shared" | "federated";
+  status: ContributionStatus;
+  n_rows: number;
+  submitted_at: string;
+  reviewed_at: string | null;
+  review_note: string | null;
+}
+
+/** One project I may use the model of. Owned projects are excluded — those
+ *  already appear under "Projects I own" via `projects.mine()`. */
+export interface MyAccess {
+  project_slug: string;
+  project_title: string;
+  role: "contributor" | "viewer";
+  granted_at: string;
+}
+
+/** One pending contribution awaiting my decision, across every project I own. */
+export interface MyReviewQueueItem {
+  project_slug: string;
+  project_title: string;
+  contribution_id: number;
+  contributor_name: string;
+  mode: "shared" | "federated";
+  n_rows: number;
+  submitted_at: string;
+}
+
+export const me = {
+  contributions: () => api.get<MyContribution[]>("/me/contributions"),
+  access: () => api.get<MyAccess[]>("/me/access"),
+  reviewQueue: () => api.get<MyReviewQueueItem[]>("/me/review-queue"),
+};
+
 export const health = () => api.get<HealthReport>("/health");

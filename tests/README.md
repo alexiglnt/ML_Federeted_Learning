@@ -15,6 +15,7 @@ python tests/smoke_lot3.py        # project page: validity domain, prediction, e
 python tests/smoke_lot4.py        # discovery: facets, and ranking projects against a file
 python tests/smoke_lot5.py        # review: the two scores, access granted and taken away
 python tests/smoke_lot5b.py       # federated: exactness, and the double-counting trap
+python tests/smoke_notifications.py  # review events reach the bell and /api/me/*
 
 # Inside the container — these need numpy and the api package, not a server.
 docker compose exec app python tests/check_aggregation.py
@@ -126,7 +127,13 @@ coverage. Specifically:
   ever inverts, sharing data stops being worth anything;
 - converting a federated contribution to shared leaves the project holding
   twenty rows rather than thirty, and its coefficients still equal the pooled
-  fit — the §5.5 double count, checked where it would actually show.
+  fit — the §5.5 double count, checked where it would actually show;
+- a submitted contribution raises the owner's unread notification count by
+  exactly one and never the submitter's own, and a review decision does the
+  same in reverse for the contributor — including the review note travelling
+  into the notification body. `/api/me/contributions`, `/api/me/access` and
+  `/api/me/review-queue` are checked at each stage, and a notification can only
+  be marked read by its own recipient.
 
 **They write to the database they run against.** Accounts and projects are
 tagged with a random suffix so repeated runs do not collide, but they

@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 
 import { useAuth } from "../lib/auth";
 import { currentTheme, toggleTheme, type Theme } from "../lib/theme";
+import NotificationBell from "./NotificationBell";
 
 function ThemeToggle() {
   const [theme, setThemeState] = useState<Theme>(() => currentTheme());
@@ -51,6 +52,7 @@ export default function Layout() {
             {!loading &&
               (user ? (
                 <>
+                  <NotificationBell />
                   <Link to="/me" className="who">
                     {user.full_name}
                   </Link>
