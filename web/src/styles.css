@@ -652,6 +652,25 @@ label.mode-card input[type="radio"] {
   background: var(--danger-soft);
   color: var(--danger);
 }
+/* The one-glance read of a pending contribution, echoing .reading's tones. */
+.badge.good {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.badge.valuable {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border: 1px solid var(--accent);
+}
+.badge.poor {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.badge-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
 
 .warning-list {
   padding-left: 1.1rem;

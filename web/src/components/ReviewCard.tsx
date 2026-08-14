@@ -36,55 +36,91 @@ function verdict(value: number | null | undefined): "good" | "weak" | "poor" | "
   return "poor";
 }
 
-function Reading({ transfer, refit }: { transfer: number | null; refit: number | null }) {
+/** The same read of transfer + refit feeds both the full paragraph below and
+ *  the one-glance badge in the header — one branch to keep in sync instead of
+ *  two copies drifting apart. */
+type ReadingKind =
+  | "unknown"
+  | "transferOnly"
+  | "consistent"
+  | "valuable"
+  | "outlierNoise"
+  | "mixed";
+
+function summarize(transfer: number | null, refit: number | null): ReadingKind {
   const t = verdict(transfer);
   const r = verdict(refit);
+  if (t === "unknown" && r === "unknown") return "unknown";
+  if (t === "unknown") return "transferOnly";
+  if (t === "good") return "consistent";
+  if (r === "good") return "valuable";
+  if (r === "poor") return "outlierNoise";
+  return "mixed";
+}
 
-  if (t === "unknown" && r === "unknown") return null;
-  if (t === "unknown") {
-    return (
-      <p className="reading">
-        There was no published model to test against when this arrived, so only
-        the refit score says anything. It reports whether these measurements are
-        internally consistent.
-      </p>
-    );
+function Reading({ transfer, refit }: { transfer: number | null; refit: number | null }) {
+  switch (summarize(transfer, refit)) {
+    case "unknown":
+      return null;
+    case "transferOnly":
+      return (
+        <p className="reading">
+          There was no published model to test against when this arrived, so only
+          the refit score says anything. It reports whether these measurements are
+          internally consistent.
+        </p>
+      );
+    case "consistent":
+      return (
+        <p className="reading good">
+          <strong>Consistent with the data already here.</strong> The existing
+          model predicts these measurements without being refitted.
+        </p>
+      );
+    case "valuable":
+      return (
+        <p className="reading valuable">
+          <strong>Clean data from a regime the model does not cover.</strong> The
+          measurements are highly predictable on their own, but the published
+          model does not reach them. This is the most valuable kind of
+          contribution there is — it extends the validity domain. Do not reject it
+          for the poor transfer score.
+        </p>
+      );
+    case "outlierNoise":
+      return (
+        <p className="reading poor">
+          <strong>Worth a hard look.</strong> The model does not predict this
+          data, and neither does a model fitted on the data itself. That pattern
+          is what noise looks like.
+        </p>
+      );
+    default:
+      return (
+        <p className="reading">
+          Mixed. The published model does not transfer well and a fit on this data
+          alone is only moderate. Ask what changed between the two benches — the
+          measurement method is a common answer.
+        </p>
+      );
   }
-  if (t === "good") {
-    return (
-      <p className="reading good">
-        <strong>Consistent with the data already here.</strong> The existing
-        model predicts these measurements without being refitted.
-      </p>
-    );
-  }
-  if (r === "good") {
-    return (
-      <p className="reading valuable">
-        <strong>Clean data from a regime the model does not cover.</strong> The
-        measurements are highly predictable on their own, but the published
-        model does not reach them. This is the most valuable kind of
-        contribution there is — it extends the validity domain. Do not reject it
-        for the poor transfer score.
-      </p>
-    );
-  }
-  if (r === "poor") {
-    return (
-      <p className="reading poor">
-        <strong>Worth a hard look.</strong> The model does not predict this
-        data, and neither does a model fitted on the data itself. That pattern
-        is what noise looks like.
-      </p>
-    );
-  }
-  return (
-    <p className="reading">
-      Mixed. The published model does not transfer well and a fit on this data
-      alone is only moderate. Ask what changed between the two benches — the
-      measurement method is a common answer.
-    </p>
-  );
+}
+
+/** A one-glance echo of `Reading`, for the header — the full paragraph
+ *  explains the numbers, this just says which way to lean before reading it. */
+const SUMMARY_BADGE: Record<ReadingKind, { tone: string; label: string } | null> = {
+  unknown: null,
+  transferOnly: { tone: "warn", label: "new regime, unverified" },
+  consistent: { tone: "good", label: "consistent with model" },
+  valuable: { tone: "valuable", label: "extends coverage" },
+  outlierNoise: { tone: "poor", label: "worth a hard look" },
+  mixed: { tone: "warn", label: "mixed signal" },
+};
+
+function SummaryBadge({ transfer, refit }: { transfer: number | null; refit: number | null }) {
+  const badge = SUMMARY_BADGE[summarize(transfer, refit)];
+  if (!badge) return null;
+  return <span className={`badge ${badge.tone}`}>{badge.label}</span>;
 }
 
 /** Thresholds for a *change* in leave-one-lab-out R², not an R² itself — a
@@ -200,6 +236,9 @@ export default function ReviewCard({
     return values.length ? Math.min(...values) : null;
   };
 
+  const worstTransfer = worst((key) => transfer?.per_target?.[key]?.r2);
+  const worstRefit = worst(refitOf);
+
   return (
     <article className="review-card">
       <header className="page-head">
@@ -207,7 +246,10 @@ export default function ReviewCard({
           {contribution.contributor_name}
           <span className="muted small"> · {contribution.n_rows} rows</span>
         </h3>
-        <span className="badge warn">awaiting review</span>
+        <span className="badge-row">
+          <SummaryBadge transfer={worstTransfer} refit={worstRefit} />
+          <span className="badge warn">awaiting review</span>
+        </span>
       </header>
 
       <p className="meta-line small">
@@ -294,10 +336,7 @@ export default function ReviewCard({
 
       {refit?.note && <p className="muted small">{refit.note}</p>}
 
-      <Reading
-        transfer={worst((key) => transfer?.per_target?.[key]?.r2)}
-        refit={worst(refitOf)}
-      />
+      <Reading transfer={worstTransfer} refit={worstRefit} />
 
       {contribution.mode === "shared" ? (
         <div className="poolability">
