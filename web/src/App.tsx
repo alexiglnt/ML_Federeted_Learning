@@ -4,6 +4,7 @@ import Layout from "./components/Layout";
 import { useAuth } from "./lib/auth";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
+import Docs from "./pages/Docs";
 import Me from "./pages/Me";
 import NotFound from "./pages/NotFound";
 import Notifications from "./pages/Notifications";
@@ -70,6 +71,7 @@ export default function App() {
           }
         />
         <Route path="variables" element={<Variables />} />
+        <Route path="docs" element={<Docs />} />
         <Route
           path="notifications"
           element={
