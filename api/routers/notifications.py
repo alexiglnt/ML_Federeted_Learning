@@ -8,7 +8,7 @@ this router only ever reads the caller's own and marks them read.
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session, selectinload
 
 from api.db import get_db, utcnow
@@ -89,5 +89,14 @@ def mark_all_read(db: Session = Depends(get_db), user: User = Depends(get_curren
         .where(Notification.recipient_id == user.id, Notification.read_at.is_(None))
         .values(read_at=utcnow())
     )
+    db.commit()
+    return {"count": result.rowcount}
+
+
+@router.delete("")
+def clear_notifications(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """Delete every notification of the caller's own. Nothing else references
+    a notification's id, so this is a plain bulk delete, not a cascade."""
+    result = db.execute(delete(Notification).where(Notification.recipient_id == user.id))
     db.commit()
     return {"count": result.rowcount}

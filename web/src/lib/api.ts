@@ -79,6 +79,7 @@ export const api = {
     request<T>(path, { method: "POST", body: body ? JSON.stringify(body) : undefined }),
   patch: <T>(path: string, body: unknown) =>
     request<T>(path, { method: "PATCH", body: JSON.stringify(body) }),
+  delete: <T>(path: string) => request<T>(path, { method: "DELETE" }),
   /** Multipart upload. Content-Type is left unset on purpose: the browser has
    *  to add it itself so that it carries the multipart boundary. */
   postForm: <T>(path: string, form: FormData) =>
@@ -401,6 +402,8 @@ export const projects = {
     api.post<ProjectDetail>("/projects", payload),
   update: (slug: string, payload: ProjectUpdatePayload) =>
     api.patch<ProjectDetail>(`/projects/${encodeURIComponent(slug)}`, payload),
+  /** Irreversible — everything recorded against the project cascades with it. */
+  remove: (slug: string) => api.delete<void>(`/projects/${encodeURIComponent(slug)}`),
   /** Public: the credit is public, the data is not. */
   contributors: (slug: string) =>
     api.get<ContributorOut[]>(`/projects/${encodeURIComponent(slug)}/contributors`),
@@ -782,6 +785,7 @@ export const notifications = {
   unreadCount: () => api.get<{ count: number }>("/notifications/unread-count"),
   markRead: (id: number) => api.post<NotificationOut>(`/notifications/${id}/read`),
   markAllRead: () => api.post<{ count: number }>("/notifications/read-all"),
+  clearAll: () => api.delete<{ count: number }>("/notifications"),
 };
 
 /** One row of "contributions I've made", across every project. */

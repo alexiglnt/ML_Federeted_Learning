@@ -14,7 +14,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 
 import {
   ENGINE_LABELS,
@@ -48,6 +48,7 @@ function toNumber(raw: string): number | null | undefined {
 
 export default function ProjectSettings() {
   const { slug } = useParams<{ slug: string }>();
+  const navigate = useNavigate();
 
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const [form, setForm] = useState<ProjectUpdatePayload>({});
@@ -55,6 +56,11 @@ export default function ProjectSettings() {
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [confirmTitle, setConfirmTitle] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   function adopt(detail: ProjectDetail) {
     setProject(detail);
@@ -115,6 +121,19 @@ export default function ProjectSettings() {
       setError(caught instanceof Error ? caught.message : "Could not save.");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function deleteProject() {
+    if (!slug) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await projectsApi.remove(slug);
+      navigate("/projects");
+    } catch (caught) {
+      setDeleteError(caught instanceof Error ? caught.message : "Could not delete the project.");
+      setDeleting(false);
     }
   }
 
@@ -402,6 +421,60 @@ export default function ProjectSettings() {
           </Link>
         </div>
       </form>
+
+      <div className="notice danger-zone">
+        <h2>Danger zone</h2>
+        <p>
+          Deletes this project and everything recorded against it —
+          contributions, model versions, access grants. Contributed files are
+          not removed from storage, the same as a rejected contribution's file
+          stays. This cannot be undone.
+        </p>
+
+        {!confirmingDelete ? (
+          <button type="button" className="danger" onClick={() => setConfirmingDelete(true)}>
+            Delete this project
+          </button>
+        ) : (
+          <div className="field-row wide">
+            <label htmlFor="confirm-delete">
+              Type <strong>{project.title}</strong> to confirm
+            </label>
+            <input
+              id="confirm-delete"
+              value={confirmTitle}
+              onChange={(e) => setConfirmTitle(e.target.value)}
+              autoComplete="off"
+            />
+            {deleteError && (
+              <p className="error" role="alert">
+                {deleteError}
+              </p>
+            )}
+            <div className="cta-row">
+              <button
+                type="button"
+                className="danger"
+                disabled={confirmTitle !== project.title || deleting}
+                onClick={deleteProject}
+              >
+                {deleting ? "Deleting…" : "Delete permanently"}
+              </button>
+              <button
+                type="button"
+                className="ghost"
+                onClick={() => {
+                  setConfirmingDelete(false);
+                  setConfirmTitle("");
+                  setDeleteError(null);
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </section>
   );
 }

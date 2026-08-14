@@ -366,6 +366,19 @@ button,
   background: var(--surface-alt);
 }
 
+.danger {
+  background: var(--danger);
+  color: var(--accent-text);
+  border-color: var(--danger);
+}
+.danger:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+.danger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
@@ -526,6 +539,10 @@ label.mode-card input[type="radio"] {
 }
 .notice p:last-child {
   margin-bottom: 0;
+}
+.notice.danger-zone {
+  background: var(--danger-soft);
+  border-left-color: var(--danger);
 }
 
 .key-values {

@@ -24,6 +24,11 @@ export default function Notifications() {
     );
   }
 
+  async function clearAll() {
+    await notificationsApi.clearAll();
+    setItems([]);
+  }
+
   async function openNotification(notification: NotificationOut) {
     if (!notification.read_at) {
       setItems(
@@ -47,11 +52,18 @@ export default function Notifications() {
     <section className="narrow">
       <div className="page-head">
         <h1>Notifications</h1>
-        {unreadCount > 0 && (
-          <button type="button" className="ghost" onClick={markAllRead}>
-            Mark all as read
-          </button>
-        )}
+        <span className="badge-row">
+          {unreadCount > 0 && (
+            <button type="button" className="ghost" onClick={markAllRead}>
+              Mark all as read
+            </button>
+          )}
+          {items && items.length > 0 && (
+            <button type="button" className="ghost" onClick={clearAll}>
+              Clear all
+            </button>
+          )}
+        </span>
       </div>
 
       {error && <p className="muted">{error}</p>}

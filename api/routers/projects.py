@@ -389,6 +389,26 @@ def update_project(
     return _detail(db, _load_full(db, slug), user)
 
 
+@router.delete("/{slug}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_project(
+    slug: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Delete a project and everything recorded against it. Owner only.
+
+    Irreversible. Inputs, targets, contributions, model versions and access
+    grants all cascade with it (see the ``ondelete="CASCADE"`` foreign keys in
+    api/models.py). Contributed files stay on disk, same as a rejected
+    contribution's file does — there is no file-deletion path anywhere in
+    this codebase, and a project delete is not the place to invent one.
+    """
+    project = _load_full(db, slug)
+    require_project_owner(db, project, user)
+    db.delete(project)
+    db.commit()
+
+
 @router.post("", response_model=ProjectDetail, status_code=status.HTTP_201_CREATED)
 def create_project(
     payload: ProjectCreate,
