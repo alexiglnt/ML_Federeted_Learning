@@ -236,6 +236,31 @@ main.wrap {
   font: inherit;
   cursor: pointer;
 }
+.notification-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+}
+.notification-row .notification-item {
+  flex: 1;
+  width: auto;
+  margin-bottom: 0;
+}
+.notification-remove {
+  flex-shrink: 0;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  width: 1.9rem;
+  height: 1.9rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.notification-remove:hover {
+  color: var(--danger);
+  border-color: var(--danger);
+}
 .notification-list .notification-item:last-child {
   margin-bottom: 0;
 }

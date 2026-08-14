@@ -786,6 +786,7 @@ export const notifications = {
   markRead: (id: number) => api.post<NotificationOut>(`/notifications/${id}/read`),
   markAllRead: () => api.post<{ count: number }>("/notifications/read-all"),
   clearAll: () => api.delete<{ count: number }>("/notifications"),
+  remove: (id: number) => api.delete<void>(`/notifications/${id}`),
 };
 
 /** One row of "contributions I've made", across every project. */
@@ -825,6 +826,14 @@ export const me = {
   contributions: () => api.get<MyContribution[]>("/me/contributions"),
   access: () => api.get<MyAccess[]>("/me/access"),
   reviewQueue: () => api.get<MyReviewQueueItem[]>("/me/review-queue"),
+  updateProfile: (payload: { full_name?: string; institution?: string; country?: string }) =>
+    api.patch<User>("/me", payload),
+  changePassword: (payload: { current_password: string; new_password: string }) =>
+    api.post<void>("/me/password", payload),
+  /** Anonymises the account rather than deleting the row — see the endpoint's
+   *  docstring. Blocked while the caller still owns a project. */
+  deleteAccount: (password: string) =>
+    request<void>("/me", { method: "DELETE", body: JSON.stringify({ password }) }),
 };
 
 export const health = () => api.get<HealthReport>("/health");

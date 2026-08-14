@@ -100,3 +100,18 @@ def clear_notifications(db: Session = Depends(get_db), user: User = Depends(get_
     result = db.execute(delete(Notification).where(Notification.recipient_id == user.id))
     db.commit()
     return {"count": result.rowcount}
+
+
+@router.delete("/{notification_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_notification(
+    notification_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    notification = db.scalar(
+        select(Notification).where(Notification.id == notification_id)
+    )
+    if notification is None or notification.recipient_id != user.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such notification.")
+    db.delete(notification)
+    db.commit()

@@ -60,6 +60,29 @@ class UserOut(ORMModel):
     created_at: datetime
 
 
+class ProfileUpdate(BaseModel):
+    """Every field optional; only what is sent is changed. Email and password
+    are deliberately absent — email is the account's identity and changing it
+    here would need its own re-verification story, and password has its own
+    endpoint because it needs the current one checked first."""
+
+    full_name: str | None = Field(default=None, min_length=1, max_length=160)
+    institution: str | None = Field(default=None, max_length=200)
+    country: str | None = Field(default=None, max_length=80)
+
+
+class PasswordChange(BaseModel):
+    current_password: str = Field(min_length=1, max_length=200)
+    new_password: str = Field(min_length=10, max_length=200)
+
+
+class AccountDelete(BaseModel):
+    """Confirms intent the same way a project delete does: retype something
+    that proves you meant it, not just a click that could be a misclick."""
+
+    password: str = Field(min_length=1, max_length=200)
+
+
 # --------------------------------------------------------------------------- #
 # Variable registry
 # --------------------------------------------------------------------------- #

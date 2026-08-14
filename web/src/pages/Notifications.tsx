@@ -29,6 +29,16 @@ export default function Notifications() {
     setItems([]);
   }
 
+  async function removeNotification(id: number) {
+    setItems((prev) => prev?.filter((n) => n.id !== id) ?? null);
+    try {
+      await notificationsApi.remove(id);
+    } catch {
+      // The list already dropped it; a failed delete is not worth restoring
+      // it over and confusing the user mid-click.
+    }
+  }
+
   async function openNotification(notification: NotificationOut) {
     if (!notification.read_at) {
       setItems(
@@ -74,17 +84,30 @@ export default function Notifications() {
         <ul className="notification-page-list">
           {items.map((notification) => (
             <li key={notification.id}>
-              <button
-                type="button"
-                className={`notification-item${notification.read_at ? "" : " unread"}`}
-                onClick={() => openNotification(notification)}
-              >
-                <span className="notification-title">{notification.title}</span>
-                {notification.body && <span className="notification-body">{notification.body}</span>}
-                <span className="notification-time">
-                  {new Date(notification.created_at).toLocaleString()}
-                </span>
-              </button>
+              <div className="notification-row">
+                <button
+                  type="button"
+                  className={`notification-item${notification.read_at ? "" : " unread"}`}
+                  onClick={() => openNotification(notification)}
+                >
+                  <span className="notification-title">{notification.title}</span>
+                  {notification.body && (
+                    <span className="notification-body">{notification.body}</span>
+                  )}
+                  <span className="notification-time">
+                    {new Date(notification.created_at).toLocaleString()}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  className="notification-remove"
+                  aria-label="Delete this notification"
+                  title="Delete this notification"
+                  onClick={() => removeNotification(notification.id)}
+                >
+                  ×
+                </button>
+              </div>
             </li>
           ))}
         </ul>

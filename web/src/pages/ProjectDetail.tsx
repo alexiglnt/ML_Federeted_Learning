@@ -492,6 +492,19 @@ export default function ProjectDetail() {
                             Remove from model
                           </button>
                         )}
+                        {/* The reverse of "Remove from model" — a rejection is
+                            not final, the same way accepting later is not
+                            either (uploads.py's review_contribution docstring). */}
+                        {isOwner && item.status === "rejected" && (
+                          <button
+                            type="button"
+                            className="ghost tiny-button"
+                            disabled={busyId === item.id}
+                            onClick={() => decide(item, "accept", "")}
+                          >
+                            Accept after all
+                          </button>
+                        )}
                         {/* Converting rather than uploading again: the same row
                             changes mode, so the data cannot be counted twice
                             (ARCHITECTURE.md §5.5). */}
