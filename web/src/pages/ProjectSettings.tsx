@@ -24,6 +24,7 @@ import {
   type ProjectDetail,
   type ProjectUpdatePayload,
 } from "../lib/api";
+import { useAuth } from "../lib/auth";
 
 type Bounds = { min: string; max: string; sign: string };
 
@@ -49,6 +50,7 @@ function toNumber(raw: string): number | null | undefined {
 export default function ProjectSettings() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const [form, setForm] = useState<ProjectUpdatePayload>({});
@@ -149,7 +151,10 @@ export default function ProjectSettings() {
   }
   if (!project) return <p className="muted">Loading…</p>;
 
-  if (project.viewer_role !== "owner") {
+  // The API lets an administrator manage any project (require_project_owner),
+  // but reports viewer_role as "owner" only for the real owner — so the page
+  // has to accept the admin role itself.
+  if (project.viewer_role !== "owner" && user?.role !== "admin") {
     return (
       <section>
         <p className="eyebrow">

@@ -264,7 +264,7 @@ export default function ProjectDetail() {
             Use the model
           </Link>
         )}
-        {isOwner && (
+        {(isOwner || user?.role === "admin") && (
           <Link to={`/projects/${project.slug}/settings`} className="ghost button-like">
             Settings
           </Link>
