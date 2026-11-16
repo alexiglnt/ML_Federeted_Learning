@@ -8,11 +8,11 @@ set -e
 echo "[entrypoint] applying database migrations"
 alembic upgrade head
 
-if [ "${MLFL_SEED_ON_START}" = "1" ]; then
-  # Idempotent: it fills an empty database and does nothing to a populated one.
-  echo "[entrypoint] seeding (no-op if the database already has content)"
-  python -m api.seed
-fi
+# Always: the variable registry is required for the app to work. Idempotent —
+# it only adds entries that are missing. The demo account/project are added
+# only when MLFL_SEED_DEMO=1 (never set that on a public deployment).
+echo "[entrypoint] seeding the variable registry (demo: ${MLFL_SEED_DEMO:-0})"
+python -m api.seed
 
 echo "[entrypoint] starting: $*"
 exec "$@"

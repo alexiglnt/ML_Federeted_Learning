@@ -1,14 +1,18 @@
 """Fill an empty database with a usable starting point.
 
-Run by the entrypoint when MLFL_SEED_ON_START=1, and safe to run again: it
-checks for existing content and does nothing rather than duplicating. Somebody
-restarting this project cold should get a site with a populated registry and a
-real example project, not an empty shell that looks broken.
+Run by the entrypoint on every start, and safe to run again: it checks for
+existing content and does nothing rather than duplicating. The variable
+registry is always loaded (adding any missing entry), because the application
+is unusable without it. The demo account and project are loaded only when
+MLFL_SEED_DEMO=1: that account has a published password and must never exist
+on a public deployment.
 
     python -m api.seed
 """
 
 from __future__ import annotations
+
+import os
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -205,7 +209,7 @@ def seed_variables(db: Session) -> dict[str, Variable]:
 DEMO_EMAIL = "demo@example.com"
 # A weak, published password. This account exists only so that a fresh install
 # is explorable; it must not be created on a public deployment, which is why
-# seeding is behind MLFL_SEED_ON_START — see ROADMAP.md.
+# seeding is behind MLFL_SEED_DEMO — see ROADMAP.md.
 DEMO_PASSWORD = "demo-account-not-for-production"
 
 
@@ -295,11 +299,13 @@ def main() -> None:
         # start, and a populated database must come out untouched.
         already = db.scalar(select(Variable.id).limit(1))
         variables = seed_variables(db)
-        seed_demo_project(db, variables)
+        with_demo = os.environ.get("MLFL_SEED_DEMO") == "1"
+        if with_demo:
+            seed_demo_project(db, variables)
         db.commit()
         print(
             "[seed] registry ready"
-            + ("" if already else f", demo account {DEMO_EMAIL}")
+            + (f", demo account {DEMO_EMAIL}" if with_demo and not already else "")
         )
     finally:
         db.close()

@@ -39,8 +39,8 @@ services:
       # Development default. Startup refuses to run with this value when
       # MLFL_ENVIRONMENT is anything other than "development" (api/config.py).
       MLFL_SECRET_KEY: dev-only-insecure-secret-change-me
-      # Set to 1 to load the demo registry and project on an empty database.
-      MLFL_SEED_ON_START: "1"
+      # Set to 1 to also load the demo account and project (development only).
+      MLFL_SEED_DEMO: "1"
     volumes:
       # Uploaded files and model artefacts live outside the image, so a rebuild
       # of the code never touches contributors' data.
