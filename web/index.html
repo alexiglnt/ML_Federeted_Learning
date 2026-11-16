@@ -1,220 +1,27 @@
 <!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Federated residual-stress models — DEAM Lab</title>
-<meta name="description" content="Score your own machining residual-stress measurements against pre-trained models. Your data never leaves your computer.">
-<script>
-  /* Posé avant le CSS et avant le corps de page : évite un éclair de thème
-   * clair puis sombre au chargement pour un visiteur qui avait choisi le
-   * sombre la dernière fois. Par défaut (rien en mémoire) : thème clair,
-   * quel que soit le réglage du système. */
-  if (localStorage.getItem("deam-theme") === "dark") {
-    document.documentElement.setAttribute("data-theme", "dark");
-  }
-</script>
-<link rel="stylesheet" href="css/style.css">
-</head>
-<body>
-
-<header class="site-header">
-  <div class="wrap">
-    <div class="header-top">
-      <p class="eyebrow">DEAM Lab — machining residual stresses</p>
-      <div class="header-controls">
-        <a href="admin.html" class="header-link">Admin</a>
-        <button type="button" id="theme-toggle" class="theme-toggle"
-                aria-pressed="false">
-          <span class="theme-toggle-icon" aria-hidden="true">🌙</span>
-          <span class="theme-toggle-label">Dark mode</span>
-        </button>
-      </div>
-    </div>
-    <h1>Test your measurements against our models</h1>
-    <p class="lead">
-      Load your own residual-stress measurements and see straight away how well
-      our pre-trained models describe them. The computation runs inside your
-      browser: <strong>your measurements are never uploaded</strong>. If you then
-      choose to contribute, only model coefficients and summary sums are sent —
-      never a single measured value. The source of this page is readable and
-      contains only the three network calls listed in <code>js/api.js</code>.
-    </p>
-    <p class="model-badge" id="model-badge" aria-live="polite">Loading the global model…</p>
-  </div>
-</header>
-
-<main class="wrap">
-
-  <!-- 1 ------------------------------------------------------------------- -->
-  <section class="step" id="step-data">
-    <h2><span class="num">1</span> Your measurements</h2>
-    <p>
-      A CSV or tab-separated file with one row per machining condition. Semicolon
-      separators and decimal commas from European Excel exports are handled
-      automatically, as are leading title rows.
-    </p>
-    <div class="dropzone" id="dropzone" tabindex="0" role="button"
-         aria-describedby="drop-hint">
-      <input type="file" id="file-input" accept=".csv,.txt,.tsv" hidden>
-      <p class="drop-title">Drop your file here, or click to choose</p>
-      <p class="drop-hint" id="drop-hint">.csv, .txt, .tsv — nothing is uploaded</p>
-    </div>
-    <p class="template-line">
-      Not sure about the format?
-      <a href="template/titanium_template.csv" download>Download the template</a>
-      — it already contains the expected columns and two example rows.
-    </p>
-    <div id="file-report" class="report" hidden></div>
-  </section>
-
-  <!-- 2 ------------------------------------------------------------------- -->
-  <section class="step" id="step-columns" hidden>
-    <h2><span class="num">2</span> Match your columns</h2>
-    <p>
-      We guessed the correspondence from your column names. Correct anything that
-      is wrong — the models need these four cutting parameters, in these units.
-    </p>
-    <div class="mapping" id="mapping"></div>
-    <div class="field-row">
-      <label for="target-select">Residual stress to predict</label>
-      <select id="target-select"></select>
-    </div>
-    <div id="mapping-issues" class="report" hidden></div>
-    <button class="primary" id="run-button" disabled>Compute my scores</button>
-  </section>
-
-  <!-- 3 ------------------------------------------------------------------- -->
-  <section class="step" id="step-results" hidden>
-    <h2><span class="num">3</span> Your two scores</h2>
-    <div class="score-grid">
-      <article class="score-card" id="card-transfer">
-        <h3>Transfer</h3>
-        <p class="card-sub">Our published model applied to your data, with no refitting.</p>
-        <div class="score-values"></div>
-        <p class="card-question">Does our model work outside our own lab?</p>
-      </article>
-      <article class="score-card" id="card-refit">
-        <h3>Refit</h3>
-        <p class="card-sub">The model refitted on your data only, scored by leave-one-out.</p>
-        <div class="score-values"></div>
-        <p class="card-question">Are your measurements predictable at all?</p>
-      </article>
-    </div>
-    <p class="reading" id="reading"></p>
-    <details class="details">
-      <summary>Full numbers and fitted coefficients</summary>
-      <div id="details-body"></div>
-    </details>
-  </section>
-
-  <!-- 4 ------------------------------------------------------------------- -->
-  <section class="step" id="step-contribute" hidden>
-    <h2><span class="num">4</span> Contribute to the global model <span class="optional">optional</span></h2>
-    <p>
-      Contributing improves the model for everyone without disclosing your
-      measurements. What leaves your browser is listed in full below, and you can
-      inspect it before sending.
-    </p>
-
-    <div class="privacy-box">
-      <h3>What is sent</h3>
-      <ul>
-        <li>What you type in the form below: your name, laboratory, material, measurement method.</li>
-        <li>The number of rows and the <em>range</em> (min–max) of each cutting parameter.</li>
-        <li>Summary sums over your data — <code>D'D</code>, <code>D'y</code>, <code>y'y</code>, <code>n</code> — which let us refit the model on the pooled data exactly, without moving any measurement.</li>
-        <li>The coefficients fitted on your machine, and the two scores above.</li>
-      </ul>
-      <h3>What is never sent</h3>
-      <ul>
-        <li>Your measurement table. No row, no individual value, at any point.</li>
-      </ul>
-      <p class="caveat">
-        One honest caveat: those summary sums are not anonymous. On very few rows
-        they reveal a lot about the dataset — with a single row they would give it
-        away entirely. This is why contributions need at least
-        <strong id="min-rows">5</strong> rows, and why we say so here rather than
-        claiming a guarantee we cannot make.
-      </p>
-    </div>
-
-    <form id="contribute-form" class="form-grid" novalidate>
-      <div class="field-row">
-        <label for="c-name">Your name</label>
-        <input id="c-name" name="name" required maxlength="120" autocomplete="name">
-      </div>
-      <div class="field-row">
-        <label for="c-lab">Laboratory or company</label>
-        <input id="c-lab" name="lab" required maxlength="200" autocomplete="organization">
-      </div>
-      <div class="field-row">
-        <label for="c-email">Email <span class="hint">optional, so we can credit you</span></label>
-        <input id="c-email" name="email" type="email" maxlength="200" autocomplete="email">
-      </div>
-      <div class="field-row">
-        <label for="c-material">Material</label>
-        <input id="c-material" name="material" required maxlength="120" value="Ti-6Al-4V">
-      </div>
-      <div class="field-row">
-        <label for="c-method">Residual stress measurement method</label>
-        <select id="c-method" name="measurement_method" required>
-          <option value="XRD">X-ray diffraction (XRD)</option>
-          <option value="hole-drilling">Incremental hole drilling</option>
-          <option value="neutron">Neutron diffraction</option>
-          <option value="contour">Contour method</option>
-          <option value="other">Other</option>
-        </select>
-        <p class="hint">
-          Required, because methods disagree: XRD and hole drilling differ by
-          tens of MPa on the same part. Pooling them unknowingly would average
-          two conventions.
-        </p>
-      </div>
-      <div class="field-row">
-        <label for="c-process">Process <span class="hint">optional</span></label>
-        <input id="c-process" name="process" maxlength="120" placeholder="orthogonal turning">
-      </div>
-      <div class="field-row">
-        <label for="c-coolant">Cooling condition <span class="hint">optional</span></label>
-        <input id="c-coolant" name="coolant" maxlength="120" placeholder="dry, flood, MQL…">
-      </div>
-      <div class="field-row full">
-        <label for="c-notes">Notes <span class="hint">optional — anything we should know to read your data correctly</span></label>
-        <textarea id="c-notes" name="notes" rows="3" maxlength="2000"></textarea>
-      </div>
-      <div class="field-row full">
-        <label for="c-key">Access key</label>
-        <input id="c-key" name="key" required autocomplete="off"
-               placeholder="the key we sent you by email">
-        <p class="hint">
-          The key keeps the global model from being altered by anyone passing by.
-          Ask us if you do not have one.
-        </p>
-      </div>
-      <details class="details full">
-        <summary>Inspect exactly what will be sent</summary>
-        <pre id="payload-preview" class="payload"></pre>
-      </details>
-      <div class="full submit-row">
-        <button class="primary" type="submit" id="send-button">Send my contribution</button>
-        <button class="secondary" type="button" id="download-button">Download it instead</button>
-      </div>
-      <div id="contribute-report" class="report full" hidden></div>
-    </form>
-  </section>
-
-  <!-- 5 ------------------------------------------------------------------- -->
-  <section class="step" id="step-history">
-    <h2>The global model</h2>
-    <p id="history-intro">
-      Each contribution is reviewed, then folded into a new version by an exact
-      refit on the pooled sums — not by averaging coefficients.
-    </p>
-    <div id="history"></div>
-  </section>
-
-</main>
-
-<script type="module" src="js/main.js"></script>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Machining model platform</title>
+    <meta
+      name="description"
+      content="Pool machining measurements across labs. Create a project, contribute data, and share the resulting models."
+    />
+    <script>
+      /* Before the stylesheet and before the body, so a visitor who chose dark
+         last time does not get a flash of light theme on load. */
+      try {
+        if (localStorage.getItem("mlfl-theme") === "dark") {
+          document.documentElement.setAttribute("data-theme", "dark");
+        }
+      } catch (_) {
+        /* localStorage can throw in a locked-down browser; the default is fine. */
+      }
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
 </html>

@@ -1,0 +1,23 @@
+# Pinned deliberately. See ARCHITECTURE.md §2.1: the realistic scenario for
+# this repository is a cold restart months from now, and unpinned dependencies
+# are how that restart fails.
+
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic==2.10.4
+pydantic-settings==2.7.0
+# Backs pydantic's EmailStr. Not pulled in by pydantic itself, and its absence
+# only surfaces at import time of the first schema that uses EmailStr.
+email-validator==2.2.0
+sqlalchemy==2.0.36
+alembic==1.14.0
+psycopg[binary]==3.2.3
+python-multipart==0.0.20
+itsdangerous==2.2.0
+argon2-cffi==23.1.0
+
+# Data handling and model fitting.
+numpy==2.2.1
+pandas==2.2.3
+scikit-learn==1.6.0
+openpyxl==3.1.5

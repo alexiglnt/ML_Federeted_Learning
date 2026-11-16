@@ -1,0 +1,17 @@
+# Normalise line endings so the repository behaves the same on Windows, macOS
+# and Linux.
+* text=auto eol=lf
+
+# These MUST stay LF whatever the checkout platform. A shell script with CRLF
+# endings fails inside a Linux container with a baffling error
+# ("bad interpreter: /bin/sh^M"), and the Dockerfile copies these verbatim —
+# so a Windows clone would produce an image that cannot start.
+*.sh text eol=lf
+Dockerfile text eol=lf
+entrypoint.sh text eol=lf
+
+# Binary: never touch.
+*.png binary
+*.jpg binary
+*.xlsx binary
+*.pdf binary

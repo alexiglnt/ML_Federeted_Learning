@@ -1,29 +1,53 @@
+# `docker compose up --build` is the whole contract — no local Node, no local
+# Python. See ROADMAP.md.
+#
+# This file runs the app and the database only. Putting it behind Caddy for
+# TLS is a deployment concern and has not been done yet; the pre-rebuild
+# Caddyfile and its notes are kept in legacy/ for whoever gets there.
+
 services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: mlfl
+      POSTGRES_PASSWORD: mlfl
+      POSTGRES_DB: mlfl
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    # The app waits for this before running migrations; without it the first
+    # `up` races the database's own initialisation and fails on a cold volume.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mlfl -d mlfl"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    ports:
+      # Exposed for inspection with psql during development. Drop this line on
+      # a real server — there is no reason for the database to face the network.
+      - "127.0.0.1:5432:5432"
+
   app:
     build: .
     restart: unless-stopped
-    env_file: .env
-    # server/store/ vit hors de l'image : c'est ce qui fait que les
-    # contributions reçues et les versions publiées survivent à un
-    # `docker compose up --build` (mise à jour du code).
-    volumes:
-      - ./server/store:/app/server/store
-    expose:
-      - "8000"
-
-  caddy:
-    image: caddy:2-alpine
-    restart: unless-stopped
     depends_on:
-      - app
-    ports:
-      - "80:80"
-      - "443:443"
+      db:
+        condition: service_healthy
+    environment:
+      MLFL_ENVIRONMENT: development
+      MLFL_DATABASE_URL: postgresql+psycopg://mlfl:mlfl@db:5432/mlfl
+      # Development default. Startup refuses to run with this value when
+      # MLFL_ENVIRONMENT is anything other than "development" (api/config.py).
+      MLFL_SECRET_KEY: dev-only-insecure-secret-change-me
+      # Set to 1 to load the demo registry and project on an empty database.
+      MLFL_SEED_ON_START: "1"
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile
-      - caddy_data:/data
-      - caddy_config:/config
+      # Uploaded files and model artefacts live outside the image, so a rebuild
+      # of the code never touches contributors' data.
+      - app_data:/app/var/data
+    ports:
+      - "8000:8000"
 
 volumes:
-  caddy_data:
-  caddy_config:
+  db_data:
+  app_data:
