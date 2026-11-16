@@ -81,9 +81,10 @@ def delete_account(
     lineage. So this scrubs the identifying fields and locks the password
     instead of removing the row.
 
-    Still owning a project blocks this, the same way it would block a real
-    delete: the owner has to close or hand off each project first rather than
-    leave it ownerless.
+    Still owning a project blocks this: unlike a contribution, ownership is an
+    active role — the owner is the only one who can review contributions,
+    retrain, or change settings — and there is no transfer feature, so an
+    anonymised owner would leave the project stuck with nobody able to run it.
     """
     if not verify_password(payload.password, user.password_hash):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Incorrect password.")
@@ -92,8 +93,8 @@ def delete_account(
     if still_owns is not None:
         raise HTTPException(
             status.HTTP_409_CONFLICT,
-            "You still own at least one project. Delete or hand it off first, "
-            "from that project's settings.",
+            "You still own at least one project. Delete it first, from that "
+            "project's settings.",
         )
 
     user.email = f"deleted-user-{user.id}@deleted.invalid"

@@ -392,8 +392,9 @@ export default function Me() {
         {!loadingMine && mine.length > 0 ? (
           <p>
             You still own {mine.length} project{mine.length > 1 ? "s" : ""}. Delete
-            or hand each one off from its settings page before you can close
-            your account.
+            {mine.length > 1 ? " them" : " it"} from its settings page before you
+            can close your account — an owned project needs someone able to
+            review contributions to it, which a closed account no longer can.
           </p>
         ) : (
           <>

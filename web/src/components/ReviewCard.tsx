@@ -14,6 +14,7 @@
 
 import { useState } from "react";
 
+import InfoTip from "./InfoTip";
 import type { ContributionOut, PoolabilityScore } from "../lib/api";
 
 function score(value: number | null | undefined): string {
@@ -277,11 +278,19 @@ export default function ReviewCard({
                 <th scope="col">Target</th>
                 <th scope="col">
                   Transfer R²
+                  <InfoTip
+                    label="Transfer R²"
+                    text="The model as already published, applied unchanged to this contribution's rows — no refitting. Answers: does the model already work on this lab's bench?"
+                  />
                   <br />
                   <span className="hint">our model, unchanged</span>
                 </th>
                 <th scope="col">
                   Refit R²
+                  <InfoTip
+                    label="Refit R²"
+                    text="A model fit on this contribution's rows alone, cross-validated. Answers: is this lab's own data internally consistent and predictable at all?"
+                  />
                   <br />
                   <span className="hint">their data alone, cross-validated</span>
                 </th>
@@ -363,11 +372,19 @@ export default function ReviewCard({
                       <th scope="col">Target</th>
                       <th scope="col">
                         Held-out fit
+                        <InfoTip
+                          label="Held-out fit"
+                          text="A model trained on every other accepted contributor, tested on this one. High means everyone else's data already predicts this lab."
+                        />
                         <br />
                         <span className="hint">everyone else predicts this lab</span>
                       </th>
                       <th scope="col">
                         Pool effect
+                        <InfoTip
+                          label="Pool effect"
+                          text="The model's honest leave-one-lab-out R² before vs. after adding this contribution as one more group. A drop means accepting it would hurt predictions for every other lab, not just this one."
+                        />
                         <br />
                         <span className="hint">honest R² if accepted</span>
                       </th>

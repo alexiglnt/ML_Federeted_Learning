@@ -23,6 +23,7 @@ import { Link, useParams } from "react-router-dom";
 import AccessLog from "../components/AccessLog";
 import ContributorList from "../components/ContributorList";
 import DomainBar from "../components/DomainBar";
+import InfoTip from "../components/InfoTip";
 import ModelCard from "../components/ModelCard";
 import ReviewCard from "../components/ReviewCard";
 import VersionTimeline from "../components/VersionTimeline";
@@ -315,8 +316,20 @@ export default function ProjectDetail() {
               <th scope="col">#</th>
               <th scope="col">Quantity</th>
               <th scope="col">Unit</th>
-              <th scope="col">Validity domain</th>
-              <th scope="col">Physical prior</th>
+              <th scope="col">
+                Validity domain
+                <InfoTip
+                  label="Validity domain"
+                  text="Top bar: the range the project claims to cover. Bottom bar: the range there is actually accepted data for. Only the bottom one justifies trusting a prediction."
+                />
+              </th>
+              <th scope="col">
+                Physical prior
+                <InfoTip
+                  label="Physical prior"
+                  text="A constraint from domain knowledge, not from the data: the fit is penalised if increasing this input moves the target the wrong way, even where noisy data alone wouldn't rule it out."
+                />
+              </th>
             </tr>
           </thead>
           <tbody>
