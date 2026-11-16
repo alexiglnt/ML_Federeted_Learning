@@ -103,8 +103,8 @@ export function parseDelimited(text, options = {}) {
   const clean = text.replace(/^﻿/, "").replace(/\r\n?/g, "\n");
   const lines = clean.split("\n").filter((l) => l.trim() !== "");
   if (lines.length < 2) {
-    throw new Error("Le fichier ne contient pas assez de lignes pour former "
-      + "un tableau (une ligne d'en-tête et au moins une ligne de mesures).");
+    throw new Error("The file does not contain enough lines to form a "
+      + "table (one header line and at least one line of measurements).");
   }
 
   let best = null;
@@ -130,15 +130,14 @@ export function parseDelimited(text, options = {}) {
     }
   }
   if (!best || best.score === -Infinity) {
-    throw new Error("Impossible d'interpréter ce fichier comme un tableau. "
-      + "Vérifiez qu'il contient une ligne de noms de colonnes et que les "
-      + "colonnes sont séparées par des virgules, des points-virgules ou des "
-      + "tabulations.");
+    throw new Error("This file cannot be read as a table. "
+      + "Check that it contains a line of column names and that the "
+      + "columns are separated by commas, semicolons or tabs.");
   }
 
   const header = best.rows[best.headerRow];
   const columns = header.map((name, j) => (isPlaceholder(name)
-    ? `colonne ${j + 1}`
+    ? `column ${j + 1}`
     : String(name)));
   const body = best.rows.slice(best.headerRow + 1)
     .filter((row) => row.some((cell) => cell !== ""));

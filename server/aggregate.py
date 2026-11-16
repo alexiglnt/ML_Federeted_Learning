@@ -79,7 +79,7 @@ def all_versions(models_dir: Path) -> list[int]:
 def latest_version(models_dir: Path) -> int:
     versions = all_versions(models_dir)
     if not versions:
-        raise RuntimeError("Aucun modèle publié. Lancez tools/fit_pretrained.py.")
+        raise RuntimeError("No model has been published. Run tools/fit_pretrained.py.")
     return max(versions)
 
 
@@ -108,8 +108,8 @@ def run_aggregation(store: Path, exclude: list[str] | None = None,
     stats_path = stats_dir / f"aggregate_v{version}.json"
     if not stats_path.exists():
         raise RuntimeError(
-            f"Statistiques suffisantes manquantes pour la version {version} "
-            f"({stats_path.name}). Sans elles l'agrégation exacte est "
+            f"Sufficient statistics are missing for version {version} "
+            f"({stats_path.name}). Without them, exact aggregation is "
             f"impossible.")
     pooled_store = json.loads(stats_path.read_text(encoding="utf-8"))
 
@@ -126,11 +126,11 @@ def run_aggregation(store: Path, exclude: list[str] | None = None,
             "target": payload["target"], "n_rows": payload["dataset"]["n_rows"],
         }
         if record["id"] in exclude:
-            skipped.append({**summary, "reason": "laissé de côté"})
+            skipped.append({**summary, "reason": "set aside"})
             continue
         target = payload["target"]
         if payload["features"] != features or target not in pooled_store["targets"]:
-            skipped.append({**summary, "reason": "variables ou grandeur incompatibles"})
+            skipped.append({**summary, "reason": "incompatible variables or target"})
             continue
 
         entry = pooled_store["targets"][target]
@@ -154,7 +154,7 @@ def run_aggregation(store: Path, exclude: list[str] | None = None,
     }
 
     if not used:
-        result["message"] = "Aucune contribution exploitable : rien à publier."
+        result["message"] = "No usable contribution: nothing to publish."
         return result
 
     new_version = version + 1
@@ -184,9 +184,9 @@ def run_aggregation(store: Path, exclude: list[str] | None = None,
         # le retire plutôt que de laisser périmer celui de la version d'avant,
         # qui serait lu comme s'il portait sur les données réunies.
         lin["loo"] = {}
-        lin["loo_note"] = ("non calculable après agrégation : la validation "
-                           "croisée exige de retirer des points un à un, ce que "
-                           "les sommes ne permettent pas. Voir "
+        lin["loo_note"] = ("not computable after aggregation: leave-one-out "
+                           "cross-validation requires removing points one at a "
+                           "time, which the summed statistics do not allow. See "
                            "contributed_scores.")
 
         piml = target_model["engines"]["piml"]
@@ -223,9 +223,9 @@ def run_aggregation(store: Path, exclude: list[str] | None = None,
 
     result["to_version"] = new_version
     result["message"] = (
-        f"Aperçu : {len(used)} contribution(s) donneraient la version "
-        f"{new_version}. Rien n'a été écrit." if dry_run else
-        f"Version {new_version} publiée avec {len(used)} contribution(s).")
+        f"Preview: {len(used)} contribution(s) would produce version "
+        f"{new_version}. Nothing was written." if dry_run else
+        f"Version {new_version} published with {len(used)} contribution(s).")
 
     if dry_run:
         return result
@@ -272,21 +272,21 @@ def run_rollback(store: Path, target_version: int) -> dict[str, Any]:
 
     versions = all_versions(models_dir)
     if not versions:
-        raise RuntimeError("Aucun modèle publié. Lancez tools/fit_pretrained.py.")
+        raise RuntimeError("No model has been published. Run tools/fit_pretrained.py.")
     current = max(versions)
 
     if target_version not in versions:
         raise RuntimeError(
-            f"Version {target_version} introuvable. Disponibles : {versions}.")
+            f"Version {target_version} not found. Available: {versions}.")
     if target_version == current:
-        raise RuntimeError(f"La version {target_version} est déjà la plus récente.")
+        raise RuntimeError(f"Version {target_version} is already the latest.")
 
     stats_path = stats_dir / f"aggregate_v{target_version}.json"
     if not stats_path.exists():
         raise RuntimeError(
-            f"Statistiques suffisantes manquantes pour la version {target_version} "
-            f"({stats_path.name}) : revenir à cette version casserait "
-            f"l'agrégation d'une future contribution.")
+            f"Sufficient statistics are missing for version {target_version} "
+            f"({stats_path.name}): rolling back to this version would break "
+            f"the aggregation of any future contribution.")
 
     model = json.loads((models_dir / f"model_v{target_version}.json")
                        .read_text(encoding="utf-8"))
@@ -311,7 +311,7 @@ def run_rollback(store: Path, target_version: int) -> dict[str, Any]:
         "from_version": current,
         "to_version": new_version,
         "rolled_back_to": target_version,
-        "message": (f"Version {new_version} publiée, contenu identique à la "
+        "message": (f"Version {new_version} published, with content identical to "
                    f"version {target_version}."),
     }
 
@@ -320,21 +320,23 @@ def run_rollback(store: Path, target_version: int) -> dict[str, Any]:
 # Ligne de commande
 # --------------------------------------------------------------------------- #
 def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(
+        description="Federated aggregation: publishes a new version of the "
+                    "global model.")
     parser.add_argument("--list", action="store_true",
-                        help="affiche la file d'attente et s'arrête")
+                        help="show the queue and exit")
     parser.add_argument("--dry-run", action="store_true",
-                        help="calcule la nouvelle version sans rien écrire")
+                        help="compute the new version without writing anything")
     parser.add_argument("--exclude", nargs="*", default=[],
                         metavar="ID",
-                        help="identifiants de contributions à laisser de côté")
+                        help="IDs of contributions to set aside")
     args = parser.parse_args()
 
     queue_dir = STORE / "queue"
     queue = read_queue(queue_dir)
     if args.list or not queue:
         if not queue:
-            print("File d'attente vide.")
+            print("Queue is empty.")
         for _, record in queue:
             payload = record["payload"]
             who = payload["contributor"]
@@ -352,7 +354,7 @@ def main() -> None:
 
     print(f"\n{result['message']}")
     for s in result["skipped"]:
-        print(f"  — {s['id']} ignoré ({s['reason']})")
+        print(f"  - {s['id']} skipped ({s['reason']})")
     if not result["used"]:
         return
 
@@ -364,8 +366,8 @@ def main() -> None:
     if args.dry_run:
         return
 
-    print(f"\n[out] store/models/model_v{result['to_version']}.json  (à envoyer au VPS)")
-    print(f"[out] store/stats/aggregate_v{result['to_version']}.json  (privé)")
+    print(f"\n[out] store/models/model_v{result['to_version']}.json  (to upload to the VPS)")
+    print(f"[out] store/stats/aggregate_v{result['to_version']}.json  (private)")
 
 
 if __name__ == "__main__":

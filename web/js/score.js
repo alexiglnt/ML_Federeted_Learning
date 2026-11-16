@@ -121,23 +121,23 @@ export function interpret(transferR2, refitR2) {
   const good = (r) => r >= 0.5;
   const poor = (r) => r < 0;
   if (good(transferR2) && good(refitR2)) {
-    return "Le modèle global se transfère à vos mesures : il les prédit sans " +
-      "avoir été réajusté. C'est le meilleur cas de figure, et votre jeu " +
-      "confirme le modèle publié.";
+    return "The global model transfers to your measurements: it predicts them " +
+      "without being refitted. This is the best case, and your dataset " +
+      "confirms the published model.";
   }
   if (!good(transferR2) && good(refitR2)) {
-    return "Vos mesures sont cohérentes entre elles — un modèle ajusté dessus " +
-      "les prédit bien — mais le modèle global ne s'y transfère pas. C'est " +
-      "l'information la plus utile que vous puissiez nous transmettre : elle " +
-      "indique un régime que le modèle publié ne couvre pas.";
+    return "Your measurements are internally consistent (a model refitted on " +
+      "them predicts them well), but the global model does not transfer to " +
+      "them. This is the most useful information you can send us: it points " +
+      "to a regime that the published model does not cover.";
   }
   if (poor(refitR2)) {
-    return "Même réajusté sur vos seules données, le modèle ne les prédit pas. " +
-      "Cela vient en général d'un domaine expérimental trop resserré, d'une " +
-      "dispersion de mesure importante, ou d'une variable déterminante " +
-      "absente du tableau — pas nécessairement d'un problème de modèle.";
+    return "Even when refitted on your data alone, the model does not predict " +
+      "them. This usually comes from an experimental domain that is too " +
+      "narrow, large measurement scatter, or a key variable missing from " +
+      "the table, not necessarily from a problem with the model.";
   }
-  return "Résultat intermédiaire : le modèle capte une partie de la tendance " +
-    "sans être fiable point par point. À interpréter avec le nombre de " +
-    "conditions et l'étendue du domaine exploré.";
+  return "Intermediate result: the model captures part of the trend " +
+    "without being reliable point by point. Interpret it in light of the " +
+    "number of conditions and the extent of the domain explored.";
 }

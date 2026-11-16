@@ -108,13 +108,13 @@ def load_model(version: int | None = None) -> dict[str, Any]:
     if not versions:
         raise HTTPException(
             status.HTTP_503_SERVICE_UNAVAILABLE,
-            "Aucun modèle global publié. Lancez tools/fit_pretrained.py.")
+            "No global model has been published. Run tools/fit_pretrained.py.")
     wanted = versions[-1] if version is None else version
     path = MODELS_DIR / f"model_v{wanted}.json"
     if not path.exists():
         raise HTTPException(status.HTTP_404_NOT_FOUND,
-                            f"Version {wanted} inconnue. "
-                            f"Disponibles : {versions}")
+                            f"Unknown version {wanted}. "
+                            f"Available: {versions}")
     return json.loads(path.read_text(encoding="utf-8"))
 
 
@@ -122,20 +122,20 @@ def require_contributor_key(x_api_key: str = Header(default="")) -> None:
     if not API_KEY:
         raise HTTPException(
             status.HTTP_503_SERVICE_UNAVAILABLE,
-            "Les contributions sont fermées : aucune clé n'est configurée sur "
-            "le serveur (variable d'environnement DEAM_FL_API_KEY).")
+            "Contributions are closed: no key is configured on the server "
+            "(environment variable DEAM_FL_API_KEY).")
     # Comparaison à temps constant : une comparaison naïve laisse deviner la
     # clé caractère par caractère en mesurant le temps de réponse.
     if not secrets.compare_digest(x_api_key.strip(), API_KEY):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED,
-                            "Clé d'accès invalide ou absente.")
+                            "Access key is invalid or missing.")
 
 
 def require_admin_key(x_admin_key: str = Header(default="")) -> None:
     if not ADMIN_KEY or not secrets.compare_digest(x_admin_key.strip(),
                                                    ADMIN_KEY):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED,
-                            "Réservé à l'administrateur.")
+                            "Administrator only.")
 
 
 # --------------------------------------------------------------------------- #
@@ -182,25 +182,25 @@ class SufficientStats(BaseModel):
     def _square_and_finite(cls, v):
         size = len(v)
         if size < 2 or any(len(row) != size for row in v):
-            raise ValueError("dtd doit être une matrice carrée")
+            raise ValueError("dtd must be a square matrix")
         arr = np.asarray(v, float)
         if not np.isfinite(arr).all():
-            raise ValueError("dtd contient des valeurs non finies")
+            raise ValueError("dtd contains non-finite values")
         # D'D est une matrice de Gram : symétrique et semi-définie positive.
         # Un envoi qui ne l'est pas est soit corrompu, soit fabriqué à la main ;
         # dans les deux cas il n'a rien à faire dans la file.
         if not np.allclose(arr, arr.T, atol=1e-6 * max(1.0, np.abs(arr).max())):
-            raise ValueError("dtd n'est pas symétrique")
+            raise ValueError("dtd is not symmetric")
         if float(np.min(np.linalg.eigvalsh(arr))) < -1e-6 * max(
                 1.0, np.abs(arr).max()):
-            raise ValueError("dtd n'est pas semi-définie positive")
+            raise ValueError("dtd is not positive semi-definite")
         return v
 
     @field_validator("dty")
     @classmethod
     def _finite(cls, v):
         if not np.isfinite(np.asarray(v, float)).all():
-            raise ValueError("dty contient des valeurs non finies")
+            raise ValueError("dty contains non-finite values")
         return v
 
 
@@ -289,34 +289,34 @@ def contribute(payload: Contribution):
     if payload.target not in model.get("targets", {}):
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_ENTITY,
-            f"Grandeur « {payload.target} » absente du modèle global. "
-            f"Connues : {', '.join(model.get('targets', {}))}")
+            f"Target \"{payload.target}\" is not in the global model. "
+            f"Known targets: {', '.join(model.get('targets', {}))}")
 
     # L'ordre des variables fait partie du contrat : une contribution dont les
     # colonnes sont permutées produirait des coefficients silencieusement faux.
     if payload.features != model.get("features"):
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_ENTITY,
-            f"Variables incompatibles avec le modèle global.\n"
-            f"Attendu : {model.get('features')}\nReçu : {payload.features}")
+            f"Variables are incompatible with the global model.\n"
+            f"Expected: {model.get('features')}\nReceived: {payload.features}")
 
     expected = len(payload.features) + 1      # + la colonne d'ordonnée
     stats = payload.sufficient_statistics
     if len(stats.dtd) != expected or len(stats.dty) != expected:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_ENTITY,
-            f"Dimensions incohérentes : {expected} attendues pour "
+            f"Inconsistent dimensions: {expected} expected for "
             f"{len(payload.features)} variables.")
     # D'D[0,0] vaut la somme de la colonne de 1, donc n. Si les deux ne
     # concordent pas, les sommes ne viennent pas du jeu annoncé.
     if abs(stats.dtd[0][0] - stats.n) > 1e-6:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_ENTITY,
-            "dtd[0][0] devrait valoir n : les sommes envoyées sont incohérentes.")
+            "dtd[0][0] should equal n: the submitted sums are inconsistent.")
     if stats.n != payload.dataset.n_rows:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_ENTITY,
-            "Le nombre de lignes annoncé ne correspond pas aux sommes envoyées.")
+            "The declared number of rows does not match the submitted sums.")
 
     received = datetime.now(timezone.utc)
     record = {
@@ -334,10 +334,10 @@ def contribute(payload: Contribution):
         "id": record["id"],
         "target": payload.target,
         "n_rows": stats.n,
-        "message": ("Contribution reçue et mise en attente de validation. "
-                    "Aucune donnée brute n'a été transmise ni conservée. "
-                    "Elle sera intégrée à la prochaine version du modèle "
-                    "global après vérification."),
+        "message": ("Contribution received and queued for review. "
+                    "No raw data was transmitted or stored. "
+                    "It will be included in the next version of the global "
+                    "model after verification."),
     }
 
 
@@ -417,7 +417,7 @@ def rollback(payload: RollbackRequest):
 def index():
     page = WEB_DIR / "index.html"
     if not page.exists():
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "web/index.html manquant")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "web/index.html is missing")
     return FileResponse(page)
 
 
