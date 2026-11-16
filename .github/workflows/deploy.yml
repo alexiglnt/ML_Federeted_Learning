@@ -4,9 +4,6 @@ on:
   push:
     branches:
       - main
-      # TEMPORARY, while rebuild-platform is still the working branch: remove
-      # this once it's merged into main and deploys should only follow main.
-      - rebuild-platform
 
 jobs:
   deploy:
