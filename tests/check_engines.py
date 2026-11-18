@@ -138,5 +138,43 @@ text = engines.format_equation("y", 1.5, ["a", "b", "c"], [2.0, 0.0, -3.0])
 check("zero coefficient omitted", "b" not in text, text)
 check("signs read naturally", "- 3" in text and "+ 2" in text, text)
 
+print("\n== the benchmark compares every engine and suggests a sensible one ==")
+X_lin, y_lin = lab(7, 25)
+rows = engines.benchmark(X_lin, y_lin, penalised_signs=SIGNS)
+check("one row per engine", len(rows) == len(Engine), str(len(rows)))
+check("every engine scored out of sample",
+      all(r["r2_cv"] is not None for r in rows),
+      str({r["engine"]: r["r2_cv"] and round(r["r2_cv"], 3) for r in rows}))
+check("no leave-one-lab-out without groups",
+      all(r["r2_leave_one_lab_out"] is None for r in rows))
+suggestion = engines.suggest_engine({"t": rows})
+check("linear data gets a linear-family suggestion",
+      suggestion["suggested"] in ("linear", "piml", "ridge"), str(suggestion))
+check("basis is cross-validation without groups", suggestion["basis"] == "r2_cv")
+
+rng = np.random.default_rng(3)
+X_nl = rng.uniform(-3, 3, size=(80, 2))
+y_nl = np.sin(2 * X_nl[:, 0]) * 50 + (X_nl[:, 1] ** 2) * 10 + rng.normal(scale=1.0, size=80)
+rows_nl = engines.benchmark(X_nl.tolist(), y_nl.tolist(), penalised_signs=[None, None])
+suggestion_nl = engines.suggest_engine({"t": rows_nl})
+check("strongly non-linear data gets a flexible engine",
+      suggestion_nl["suggested"] in ("gbm", "rf", "gpr"), str(suggestion_nl))
+
+XA, yA = lab(11, 10)
+XB, yB = lab(12, 10, offset=5.0)
+rows_g = engines.benchmark(XA + XB, yA + yB, penalised_signs=SIGNS,
+                           groups=[1] * 10 + [2] * 10)
+check("leave-one-lab-out computed with two labs",
+      all(r["r2_leave_one_lab_out"] is not None for r in rows_g if not r.get("error")))
+check("basis switches to leave-one-lab-out",
+      engines.suggest_engine({"t": rows_g})["basis"] == "r2_leave_one_lab_out")
+
+tied = [{"engine": "gpr", "r2_cv": 0.91}, {"engine": "piml", "r2_cv": 0.90},
+        {"engine": "linear", "r2_cv": 0.70}]
+check("a tie within the margin goes to the simpler engine",
+      engines.suggest_engine({"t": tied})["suggested"] == "piml")
+check("no scores means no suggestion",
+      engines.suggest_engine({"t": []})["suggested"] is None)
+
 print("\n" + ("ALL PASS" if ok else "FAILURES ABOVE"))
 sys.exit(0 if ok else 1)

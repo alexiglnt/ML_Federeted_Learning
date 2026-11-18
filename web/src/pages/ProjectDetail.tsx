@@ -17,15 +17,17 @@
  * permission matrix than the one the API enforces.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import AccessLog from "../components/AccessLog";
 import ContributorList from "../components/ContributorList";
 import DomainBar from "../components/DomainBar";
+import EngineBenchmark from "../components/EngineBenchmark";
 import InfoTip from "../components/InfoTip";
 import ModelCard from "../components/ModelCard";
 import ReviewCard from "../components/ReviewCard";
+import TrainingBanner from "../components/TrainingBanner";
 import VersionTimeline from "../components/VersionTimeline";
 import {
   ENGINE_LABELS,
@@ -35,7 +37,9 @@ import {
   type AccessLogEntry,
   type ContributionOut,
   type ContributorOut,
+  type Engine,
   type ModelVersionOut,
+  type TrainingJobOut,
   type ProjectDetail as Detail,
 } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -55,6 +59,11 @@ export default function ProjectDetail() {
   const [accessLog, setAccessLog] = useState<AccessLogEntry[]>([]);
   const [versions, setVersions] = useState<ModelVersionOut[]>([]);
   const [training, setTraining] = useState<string | null>(null);
+  /** The run in progress, as last reported by the server; drives the banner. */
+  const [activeJob, setActiveJob] = useState<TrainingJobOut | null>(null);
+  /** Which job is already being polled, so a job picked up on page load and
+   *  the same job returned by a click are not followed twice. */
+  const following = useRef<number | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -74,11 +83,23 @@ export default function ProjectDetail() {
 
   /** Wait for a queued retrain, then refresh everything it touched. */
   const followJob = useCallback(
-    async (forSlug: string, jobId: number) => {
-      for (let attempt = 0; attempt < 90; attempt++) {
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        try {
-          const state = await modelsApi.job(forSlug, jobId);
+    async (forSlug: string, job: TrainingJobOut) => {
+      if (following.current === job.id) return;
+      following.current = job.id;
+      setActiveJob(job);
+      setTraining(null);
+      try {
+        // Five minutes: the engine comparison makes a run longer than a
+        // plain refit, and giving up early would read as a failure.
+        for (let attempt = 0; attempt < 300; attempt++) {
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          let state: TrainingJobOut;
+          try {
+            state = await modelsApi.job(forSlug, job.id);
+          } catch {
+            setTraining("Lost track of the training run — reload the page in a moment.");
+            return;
+          }
           if (state.status === "done") {
             setTraining(state.log ?? "Retrained.");
             loadPublic(forSlug);
@@ -89,11 +110,13 @@ export default function ProjectDetail() {
             loadPublic(forSlug);
             return;
           }
-        } catch {
-          return;
+          setActiveJob(state);
         }
+        setTraining("Still retraining — reload the page in a moment.");
+      } finally {
+        following.current = null;
+        setActiveJob(null);
       }
-      setTraining("Still retraining — reload the page in a moment.");
     },
     [loadPublic],
   );
@@ -103,9 +126,23 @@ export default function ProjectDetail() {
     setTraining("Training…");
     try {
       const job = await modelsApi.train(slug);
-      await followJob(slug, job.id);
+      await followJob(slug, job);
     } catch (caught) {
       setTraining(caught instanceof Error ? caught.message : "Could not start training.");
+    }
+  }
+
+  /** Switch the main engine, then retrain so the new choice is what is
+   *  published — a changed setting with a stale model would read as a lie. */
+  async function chooseEngine(engine: Engine) {
+    if (!slug) return;
+    setTraining(`Switching to ${ENGINE_LABELS[engine]}…`);
+    try {
+      const updated = await projectsApi.update(slug, { main_engine: engine });
+      setProject(updated);
+      await retrain();
+    } catch (caught) {
+      setTraining(caught instanceof Error ? caught.message : "Could not change the engine.");
     }
   }
 
@@ -126,7 +163,7 @@ export default function ProjectDetail() {
       );
       loadPrivate(slug);
       loadPublic(slug);
-      if (result.training_job) await followJob(slug, result.training_job.id);
+      if (result.training_job) await followJob(slug, result.training_job);
     } catch (caught) {
       setFileError(caught instanceof Error ? caught.message : "Could not record the decision.");
     } finally {
@@ -147,7 +184,7 @@ export default function ProjectDetail() {
       );
       loadPrivate(slug);
       loadPublic(slug);
-      if (result.training_job) await followJob(slug, result.training_job.id);
+      if (result.training_job) await followJob(slug, result.training_job);
     } catch (caught) {
       setFileError(caught instanceof Error ? caught.message : "Could not withdraw.");
     } finally {
@@ -199,7 +236,16 @@ export default function ProjectDetail() {
       );
     projectsApi.contributors(slug).then(setContributors).catch(() => setContributors([]));
     modelsApi.versions(slug).then(setVersions).catch(() => setVersions([]));
-  }, [slug]);
+    // A run started elsewhere — typically by the upload that just brought the
+    // user here — is picked up and followed, rather than showing "no model
+    // yet" until someone thinks to reload.
+    modelsApi
+      .currentJob(slug)
+      .then((job) => {
+        if (job) void followJob(slug, job);
+      })
+      .catch(() => undefined);
+  }, [slug, followJob]);
 
   useEffect(() => {
     if (!slug || !user) return;
@@ -222,6 +268,7 @@ export default function ProjectDetail() {
   if (!project) return <p className="muted">Loading…</p>;
 
   const isOwner = project.viewer_role === "owner";
+  const canManage = isOwner || user?.role === "admin";
   const latest = versions[0] ?? null;
   const mainModels = latest?.models.filter((m) => m.track === "main") ?? [];
   const referenceModels = latest?.models.filter((m) => m.track === "reference") ?? [];
@@ -270,6 +317,8 @@ export default function ProjectDetail() {
           </Link>
         )}
       </div>
+
+      {activeJob && <TrainingBanner job={activeJob} />}
 
       {user && !project.viewer_can_use_model && (
         <p className="muted small">
@@ -374,7 +423,12 @@ export default function ProjectDetail() {
             </button>
           )}
           {isOwner && (
-            <button type="button" className="ghost" onClick={retrain}>
+            <button
+              type="button"
+              className="ghost"
+              onClick={retrain}
+              disabled={activeJob !== null}
+            >
               Retrain
             </button>
           )}
@@ -400,6 +454,27 @@ export default function ProjectDetail() {
               <ModelCard key={`main-${model.target_key}`} model={model} />
             ))}
           </div>
+          {latest.benchmark && (
+            <>
+              <h3>
+                Engine comparison
+                <InfoTip
+                  label="Engine comparison"
+                  text="Every engine is refitted on this version's shared rows and scored out of sample, on equal terms. It is re-run at each version, so a suggestion made on the first file is revisited as data from other labs arrives."
+                />
+              </h3>
+              <EngineBenchmark
+                benchmark={latest.benchmark}
+                currentEngine={project.main_engine}
+                targetNames={Object.fromEntries(
+                  project.targets.map((t) => [t.variable.key, t.variable.display_name]),
+                )}
+                canChoose={canManage && project.status !== "archived"}
+                busy={activeJob !== null || (training !== null && training.endsWith("…"))}
+                onChoose={chooseEngine}
+              />
+            </>
+          )}
           {referenceModels.length > 0 && (
             <details className="details">
               <summary>

@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Callable
 
 import numpy as np
 from sqlalchemy import func, select
@@ -254,8 +254,27 @@ def reference_engine(project: Project) -> Engine:
     return Engine.PIML if has_prior else Engine.LINEAR
 
 
-def train_project(db: Session, project_id: int, *, note: str | None = None) -> ModelVersion:
-    """Fit both tracks on the accepted data and publish a new version."""
+#: Phase messages shown to the user while a job runs. Kept here so the
+#: front end displays whatever the server says rather than guessing.
+PHASE_FITTING = "Fitting the models on the accepted data…"
+PHASE_BENCHMARK = "Comparing the six engines on the same data…"
+
+
+def train_project(
+    db: Session,
+    project_id: int,
+    *,
+    note: str | None = None,
+    progress: Callable[[str], None] | None = None,
+) -> ModelVersion:
+    """Fit both tracks on the accepted data and publish a new version.
+
+    `progress` is told which phase has started. It must not touch `db`: the
+    version is only committed once complete, and a progress update committed
+    through the same session would publish it half-built.
+    """
+    report = progress or (lambda _message: None)
+    report(PHASE_FITTING)
     project = _load_project(db, project_id)
     pooled = pool_shared_data(db, project)
 
@@ -305,6 +324,7 @@ def train_project(db: Session, project_id: int, *, note: str | None = None) -> M
 
     ref_engine = reference_engine(project)
     fitted_any = False
+    benchmark_rows: dict[str, list[dict]] = {}
 
     for target in sorted(project.targets, key=lambda item: item.position):
         key = target.variable.key
@@ -379,6 +399,32 @@ def train_project(db: Session, project_id: int, *, note: str | None = None) -> M
             continue
         _store(db, version, ModelTrack.MAIN, target.variable_id, main)
 
+    if fitted_any:
+        report(PHASE_BENCHMARK)
+        for target in sorted(project.targets, key=lambda item: item.position):
+            key = target.variable.key
+            X, y, groups = pooled.per_target.get(key, ([], [], []))
+            if len(y) < settings.min_contribution_rows:
+                continue
+            # ---- benchmark: every engine, same rows, same rules ----------- #
+            # Never fatal: a comparison that fails must not cost the owner the
+            # version that was just fitted.
+            try:
+                benchmark_rows[key] = engines.benchmark(
+                    X, y, penalised_signs=signs, groups=groups
+                )
+            except Exception as error:  # noqa: BLE001
+                log.warning("benchmark failed on %s: %s", key, error)
+        if benchmark_rows:
+            version.benchmark = {
+                "targets": benchmark_rows,
+                "suggestion": engines.suggest_engine(
+                    benchmark_rows,
+                    has_priors=any(item.penalised_sign for item in inputs),
+                ),
+                "current_engine": project.main_engine.value,
+            }
+
     if not fitted_any:
         raise TrainingError("No target had enough usable rows to fit a model.")
 
@@ -442,8 +488,21 @@ def run_job(session_factory, job_id: int) -> None:
         job.started_at = utcnow()
         db.commit()
 
+        def progress(message: str) -> None:
+            # A separate, short-lived session: see train_project's docstring.
+            side = session_factory()
+            try:
+                running = side.get(TrainingJob, job_id)
+                if running is not None:
+                    running.log = message
+                    side.commit()
+            except Exception:  # noqa: BLE001 - progress is cosmetic, never fatal
+                side.rollback()
+            finally:
+                side.close()
+
         try:
-            version = train_project(db, job.project_id, note=job.kind)
+            version = train_project(db, job.project_id, note=job.kind, progress=progress)
             job.status = JobStatus.DONE
             job.log = f"Published version {version.number}."
             db.commit()

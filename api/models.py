@@ -509,6 +509,10 @@ class ModelVersion(Base):
     note: Mapped[str | None] = mapped_column(Text)
     n_rows_total: Mapped[int] = mapped_column(Integer, default=0)
     n_contributions: Mapped[int] = mapped_column(Integer, default=0)
+    #: Every engine scored on this version's shared rows, plus the suggested
+    #: main engine: ``{"targets": {key: [rows]}, "suggestion": {...}}``. See
+    #: `api.services.engines.benchmark`.
+    benchmark: Mapped[dict | None] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(TZDateTime, default=utcnow)
 
     project: Mapped[Project] = relationship(back_populates="versions")

@@ -311,6 +311,161 @@ def fit(
     return result
 
 
+# --------------------------------------------------------------------------- #
+# Comparing every engine on the same data
+# --------------------------------------------------------------------------- #
+#: Two engines whose scores differ by less than this are treated as tied, and
+#: the simpler one is suggested. On the dozen rows typical here, a 0.02 gap in
+#: cross-validated R² is well inside the noise of which point was held out.
+SUGGESTION_MARGIN = 0.02
+
+#: Simplest first. Ties within `SUGGESTION_MARGIN` go to the earliest entry:
+#: a readable, federated-compatible equation beats a black box that is not
+#: demonstrably better.
+SIMPLICITY_ORDER = [
+    Engine.LINEAR,
+    Engine.PIML,
+    Engine.RIDGE,
+    Engine.GBM,
+    Engine.RF,
+    Engine.GPR,
+]
+
+
+def _nested_cross_validated(
+    engine: Engine,
+    X: np.ndarray,
+    y: np.ndarray,
+    signs: np.ndarray,
+    groups: np.ndarray | None = None,
+) -> tuple[float | None, float | None]:
+    """Out-of-sample score with the hyperparameter chosen *inside* each fold.
+
+    `fit()` picks lambda/alpha with the same leave-one-out that it then
+    reports, which flatters PIML and ridge slightly. Harmless on its own, but
+    unfair in a comparison against engines whose settings are fixed — so the
+    benchmark pays for an inner search on each outer training split instead.
+    """
+    if engine not in (Engine.PIML, Engine.RIDGE):
+        return cross_validated(engine, X, y, signs, {}, groups=groups)
+
+    n = len(y)
+    folds = _folds(n, groups)
+    if len(folds) < 2:
+        return None, None
+
+    predictions = np.full(n, np.nan)
+    for test_index in folds:
+        train_index = np.setdiff1d(np.arange(n), test_index)
+        if len(train_index) < 3:
+            continue
+        try:
+            params = _select_hyperparams(engine, X[train_index], y[train_index], signs)
+            params = {k: v for k, v in params.items() if not k.endswith("_scan_cv_r2")}
+            predict = _fit_predictor(engine, X[train_index], y[train_index], signs, params)
+            predictions[test_index] = predict(X[test_index])
+        except Exception:
+            continue
+
+    usable = np.isfinite(predictions)
+    if usable.sum() < 2:
+        return None, None
+    return r2(y[usable], predictions[usable]), rmse(y[usable], predictions[usable])
+
+
+def benchmark(
+    X_rows: list[list[float]],
+    y_values: list[float],
+    *,
+    penalised_signs: list[float | None],
+    groups: list[int] | None = None,
+    engines_to_try: list[Engine] | None = None,
+) -> list[dict[str, Any]]:
+    """Score every engine on one target, out of sample, on equal terms.
+
+    Metrics only: no artefact, no equation. One engine failing produces a row
+    with an `error` rather than aborting the comparison.
+    """
+    X = np.asarray(X_rows, float)
+    y = np.asarray(y_values, float)
+    signs = np.array([0.0 if s is None else float(s) for s in penalised_signs])
+    group_array = None if groups is None else np.asarray(groups)
+    n_groups = 0 if group_array is None else len(np.unique(group_array))
+
+    rows: list[dict[str, Any]] = []
+    for engine in engines_to_try or list(Engine):
+        row: dict[str, Any] = {
+            "engine": engine.value,
+            "federated_compatible": engine.is_federated_compatible,
+            "has_equation": engine.is_federated_compatible,
+            "r2_cv": None,
+            "rmse_cv": None,
+            "r2_leave_one_lab_out": None,
+            "n_train": len(y),
+            "n_sources": n_groups,
+        }
+        try:
+            row["r2_cv"], row["rmse_cv"] = _nested_cross_validated(engine, X, y, signs)
+            if n_groups >= 2:
+                row["r2_leave_one_lab_out"], _ = _nested_cross_validated(
+                    engine, X, y, signs, groups=group_array
+                )
+        except Exception as error:  # noqa: BLE001 - one engine failing is not fatal
+            row["error"] = str(error)[:300]
+        rows.append(row)
+    return rows
+
+
+def suggest_engine(
+    per_target: dict[str, list[dict[str, Any]]], *, has_priors: bool = False
+) -> dict[str, Any]:
+    """Pick the engine to suggest from benchmark rows of one or more targets.
+
+    The basis is leave-one-lab-out when every engine has it for every target,
+    cross-validated R² otherwise. Scores are averaged over targets, since the
+    main engine is chosen per project. Among the engines within
+    `SUGGESTION_MARGIN` of the best, the simplest wins — with PIML ahead of
+    plain least squares when the project declares physical priors, since it
+    is then the more honest of two equally good equations.
+    """
+    all_rows = [row for rows in per_target.values() for row in rows]
+    has_lolo = bool(all_rows) and all(
+        row.get("r2_leave_one_lab_out") is not None
+        for row in all_rows
+        if not row.get("error")
+    )
+    basis = "r2_leave_one_lab_out" if has_lolo else "r2_cv"
+
+    averages: dict[str, float] = {}
+    for engine in Engine:
+        scores = []
+        for rows in per_target.values():
+            match = next((r for r in rows if r["engine"] == engine.value), None)
+            if match is None or match.get(basis) is None:
+                scores = None
+                break
+            scores.append(float(match[basis]))
+        if scores:
+            averages[engine.value] = float(np.mean(scores))
+
+    if not averages:
+        return {"suggested": None, "basis": basis, "scores": {}, "margin": SUGGESTION_MARGIN}
+
+    best = max(averages.values())
+    contenders = {k for k, v in averages.items() if v >= best - SUGGESTION_MARGIN}
+    order = list(SIMPLICITY_ORDER)
+    if has_priors:
+        order.remove(Engine.PIML)
+        order.insert(0, Engine.PIML)
+    suggested = next(e.value for e in order if e.value in contenders)
+    return {
+        "suggested": suggested,
+        "basis": basis,
+        "scores": {k: round(v, 4) for k, v in averages.items()},
+        "margin": SUGGESTION_MARGIN,
+    }
+
+
 def format_equation(
     target_key: str, intercept: float, feature_keys: list[str], coefficients
 ) -> str:

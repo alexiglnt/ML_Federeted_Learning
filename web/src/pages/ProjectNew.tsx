@@ -355,6 +355,11 @@ export default function ProjectNew() {
               </option>
             ))}
           </select>
+          <span className="hint">
+            No need to get this right now. Once the first file is in, every
+            engine is scored on it and the project page suggests one — you can
+            switch in one click, and the comparison is re-run at each version.
+          </span>
         </div>
 
         <div className="notice">

@@ -702,6 +702,36 @@ export interface ModelVersionOut {
   headline_r2: number | null;
   models: FittedModelOut[];
   sources: VersionSourceOut[];
+  /** Every engine scored on this version's shared rows. Null on versions
+   *  trained before the comparison existed. */
+  benchmark: EngineBenchmark | null;
+}
+
+/** One engine's out-of-sample scores on one target. Mirrors
+ *  `api.services.engines.benchmark`. */
+export interface BenchmarkRow {
+  engine: Engine;
+  federated_compatible: boolean;
+  has_equation: boolean;
+  r2_cv: number | null;
+  rmse_cv: number | null;
+  r2_leave_one_lab_out: number | null;
+  n_train: number;
+  n_sources: number;
+  error?: string;
+}
+
+export interface EngineBenchmark {
+  targets: Record<string, BenchmarkRow[]>;
+  suggestion: {
+    suggested: Engine | null;
+    basis: "r2_cv" | "r2_leave_one_lab_out";
+    /** Score averaged over targets, on the basis above. */
+    scores: Partial<Record<Engine, number>>;
+    margin: number;
+  };
+  /** Main engine at the time the version was trained. */
+  current_engine: Engine;
 }
 
 export interface TrainingJobOut {
@@ -709,7 +739,10 @@ export interface TrainingJobOut {
   status: "queued" | "running" | "done" | "failed";
   kind: string;
   error: string | null;
+  /** While running, the phase in progress; once done, the outcome. */
   log: string | null;
+  created_at?: string | null;
+  started_at?: string | null;
 }
 
 export type ModelTrack = "reference" | "main";
@@ -748,6 +781,9 @@ export const modelsApi = {
     api.post<TrainingJobOut>(`/projects/${encodeURIComponent(slug)}/train`),
   job: (slug: string, id: number) =>
     api.get<TrainingJobOut>(`/projects/${encodeURIComponent(slug)}/jobs/${id}`),
+  /** The queued or running job, or null. Public. */
+  currentJob: (slug: string) =>
+    api.get<TrainingJobOut | null>(`/projects/${encodeURIComponent(slug)}/jobs/current`),
   predict: (slug: string, payload: PredictRequestPayload) =>
     api.post<PredictResponse>(`/projects/${encodeURIComponent(slug)}/predict`, payload),
   /** The citable JSON document: units, metrics, and the exact contributions

@@ -139,6 +139,7 @@ def _serialise_version(
         n_rows_total=version.n_rows_total,
         n_contributions=version.n_contributions,
         headline_r2=training.best_metric(models),
+        benchmark=version.benchmark,
         models=[_serialise_model(m, project, reveal=reveal) for m in models],
         sources=[
             VersionSourceOut(
@@ -240,6 +241,34 @@ def train(
     return TrainingJobOut(id=job.id, status=job.status, kind=job.kind)
 
 
+def _job_out(job: TrainingJob) -> TrainingJobOut:
+    return TrainingJobOut(
+        id=job.id, status=job.status, kind=job.kind, error=job.error, log=job.log,
+        created_at=job.created_at, started_at=job.started_at,
+    )
+
+
+@router.get("/jobs/current", response_model=TrainingJobOut | None)
+def current_job(slug: str, db: Session = Depends(get_db)):
+    """The queued or running training job, if any. Public, like the scores.
+
+    Lets a page that did not start the job — the project page right after an
+    upload, a second tab, a contributor watching — show that a new version is
+    on its way instead of a stale "no model yet".
+    """
+    project = _project(db, slug)
+    job = db.scalar(
+        select(TrainingJob)
+        .where(
+            TrainingJob.project_id == project.id,
+            TrainingJob.status.in_(["queued", "running"]),
+        )
+        .order_by(TrainingJob.id.desc())
+        .limit(1)
+    )
+    return None if job is None else _job_out(job)
+
+
 @router.get("/jobs/{job_id}", response_model=TrainingJobOut)
 def job_status(
     slug: str,
@@ -251,9 +280,7 @@ def job_status(
     job = db.get(TrainingJob, job_id)
     if job is None or job.project_id != project.id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such training job.")
-    return TrainingJobOut(
-        id=job.id, status=job.status, kind=job.kind, error=job.error, log=job.log
-    )
+    return _job_out(job)
 
 
 @router.post("/predict", response_model=PredictResponse)

@@ -9,7 +9,7 @@ default for a field nobody thought about should be "not sent".
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
@@ -539,6 +539,10 @@ class ModelVersionOut(BaseModel):
     #: The lineage — which data made this version. This is what the version
     #: timeline is for.
     sources: list[VersionSourceOut] = []
+    #: Every engine scored out of sample on this version's shared rows, and
+    #: the suggested main engine. Scores only — nothing here reveals the data
+    #: or a model, so it is shown to anyone who can see the version.
+    benchmark: dict[str, Any] | None = None
 
 
 class TrainingJobOut(BaseModel):
@@ -546,7 +550,10 @@ class TrainingJobOut(BaseModel):
     status: JobStatus
     kind: str
     error: str | None = None
+    #: While running, the phase in progress; once done, the outcome.
     log: str | None = None
+    created_at: datetime | None = None
+    started_at: datetime | None = None
 
 
 class ReviewResult(BaseModel):

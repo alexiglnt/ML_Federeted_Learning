@@ -505,6 +505,21 @@ export default function Docs() {
         <li>Linear regression, Ridge regression, PIML (linear with physical priors) — <em>can</em> be fed by summary-only contributions.</li>
         <li>Gaussian process regression, Gradient boosting, Random forest — main track only; these need the individual rows and no summary replaces them.</li>
       </ul>
+      <p>
+        <strong>Engine comparison.</strong> Each version also scores all six
+        engines on the same shared rows, out of sample — R² across labs when
+        there are at least two contributors, cross-validated R² otherwise — and
+        shows the ranking on the project page. PIML's and ridge's
+        hyperparameters are chosen inside each fold, so no engine is flattered
+        by having been tuned on the rows it is scored on. The site then{" "}
+        <em>suggests</em> a main engine: the best average score, except that
+        engines within 0.02 of the best count as tied and the simplest of them
+        wins (linear family first — PIML ahead when the project declares
+        physical priors — then boosting, forest, Gaussian process). It never
+        switches on its own: the owner decides, in one click. On a first file
+        from a single lab the suggestion is provisional, and the comparison is
+        re-run at every version so it can change as other labs contribute.
+      </p>
 
       {/* ------------------------------------------------------------------ */}
       <h2 id="upload-steps">Step by step: contributing a file</h2>
@@ -580,7 +595,9 @@ export default function Docs() {
           still gets the "forbidden" sign if the data really says so.
         </li>
         <li>
-          Choose the <strong>main engine</strong>, <strong>visibility</strong>{" "}
+          Choose the <strong>main engine</strong> (provisionally — once the
+          first file is in, the project page compares every engine on it and
+          suggests one), <strong>visibility</strong>{" "}
           (public, or unlisted — reachable by link but absent from search), and
           a <strong>licence</strong>.
         </li>
